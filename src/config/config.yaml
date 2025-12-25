@@ -1,0 +1,57 @@
+# Metis Configuration
+
+# Application metadata
+application:
+  name: "Metis"
+  description: "Type two diabetes treatment optimization system"
+  version: ${APP_VERSION}
+
+# Security & Secrets
+security:
+  # JWT Configuration
+  jwt:
+    secret_key: ${JWT_SECRET_KEY}
+    refresh_secret_key: ${JWT_REFRESH_SECRET_KEY}
+    access_token_expires: ${JWT_ACCESS_TOKEN_EXPIRES}
+    refresh_token_expires: ${JWT_REFRESH_TOKEN_EXPIRES}
+    algorithm: "HS256"
+    token_location: ["headers"]
+
+  # Password hashing
+  password:
+    bcrypt_rounds: ${BCRYPT_ROUNDS}
+
+# Server configuration
+server:
+  cors_allowed_origins: ${CORS_ALLOWED_ORIGINS}
+  ip: ${SERVER_IP}
+  port: ${SERVER_PORT}
+  debug: ${FLASK_DEBUG}
+  ssl:
+    enabled: ${SSL_ENABLED}
+    key_path: ${SSL_KEY_PATH}
+    cert_path: ${SSL_CERT_PATH}
+
+# Database configuration
+database:
+  uri: ${DATABASE_URI}
+  track_modifications: false
+  pool_size: ${DB_POOL_SIZE}
+  max_overflow: ${DB_MAX_OVERFLOW}
+  pool_timeout: 30
+  pool_recycle: 1800
+  echo: ${DB_ECHO}
+  pool_pre_ping: true
+
+# External API keys
+integrations: # Todo configure LLM integration later
+#  ai:
+#    gemini:
+#      api_key: ${GEMINI_API_KEY}
+#      model: "gemini-flash"
+
+# Logging configuration
+logging:
+  level: ${LOG_LEVEL}
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file_path: ${LOG_FILE_PATH}
