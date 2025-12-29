@@ -1,3 +1,8 @@
+"""
+Flask application factory.
+Creates and configures the Flask application with all necessary extensions and settings.
+"""
+
 import os
 import logging as python_logging
 from datetime import timedelta
@@ -5,17 +10,24 @@ from flask_cors import CORS
 from flask_jwt_extended import JWTManager
 from flask_bcrypt import Bcrypt
 from src.shared.data.database import db
+from src.shared.exceptions.error_handlers import register_error_handlers
 
-def create_app(flask_app,
-               configs,
-               blueprints=None,
-               error_handlers=None):
-    """Create and configure the Flask application using passed config parameters."""
+
+def create_app(flask_app, configs, blueprints=None):
+    """
+    Create and configure the Flask application.
+
+    Args:
+        flask_app: Flask application instance
+        configs: Dictionary of configuration sections
+        blueprints: List of blueprints to register (optional)
+
+    Returns:
+        Configured Flask application
+    """
 
     if blueprints is None:
         blueprints = []
-    if error_handlers is None:
-        error_handlers = []
 
     # Initialize Flask app
     app = flask_app
@@ -72,7 +84,7 @@ def create_app(flask_app,
     # ============================================
     db.init_app(app)
 
-    # Create all tables (including sessions table)
+    # Create all tables
     with app.app_context():
         db.create_all()
         app.logger.info("Database tables created successfully")
@@ -89,7 +101,7 @@ def create_app(flask_app,
     app.config['JWT_ALGORITHM'] = jwt_config.algorithm
     app.config['JWT_TOKEN_LOCATION'] = jwt_config.token_location
 
-    # Initialize JWT
+    # Initialize JWT Manager
     jwt = JWTManager(app)
 
     # ============================================
@@ -128,18 +140,21 @@ def create_app(flask_app,
     app.logger.setLevel(log_level)
 
     # ============================================
-    # Register Blueprints (controllers)
+    # Register Blueprints
     # ============================================
     for blueprint in blueprints:
         app.register_blueprint(blueprint)
         app.logger.info(f"Registered blueprint: {blueprint.name}")
 
     # ============================================
-    # Register custom error handling
+    # Register Global Error Handlers
     # ============================================
-    for error, handler in error_handlers:
-        app.register_error_handler(error, handler)
+    register_error_handlers(app)
+    app.logger.info("Registered global error handlers")
 
+    # ============================================
+    # Application Ready
+    # ============================================
     app.logger.info(f">> {app.config['APP_NAME']} v{app.config['APP_VERSION']} initialized successfully")
 
     return app
