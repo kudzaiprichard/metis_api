@@ -1,6 +1,6 @@
 from typing import Optional
 
-from src.modules.authentication.models.token import Token
+from src.modules.authentication.domain.models.token import Token
 from src.shared.data.base.repository import BaseRepository
 
 

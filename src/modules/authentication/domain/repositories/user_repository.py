@@ -1,6 +1,6 @@
 from typing import Optional
 
-from src.modules.authentication.models.user import User
+from src.modules.authentication.domain.models.user import User
 from src.shared.data.base.repository import BaseRepository
 
 

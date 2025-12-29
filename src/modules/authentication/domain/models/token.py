@@ -1,4 +1,4 @@
-from src.modules.authentication.models.enums import TokenType
+from src.modules.authentication.domain.models.enums import TokenType
 from src.shared.data.base.model import BaseModel
 from src.shared.data.database import db
 from datetime import datetime

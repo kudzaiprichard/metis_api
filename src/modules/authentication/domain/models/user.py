@@ -1,4 +1,4 @@
-from src.modules.authentication.models.enums import Role
+from src.modules.authentication.domain.models.enums import Role
 from src.shared.data.base.model import BaseModel
 from src.shared.data.database import db
 from werkzeug.security import generate_password_hash, check_password_hash
