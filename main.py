@@ -3,18 +3,19 @@ import os
 from flask import Flask
 from dotenv import load_dotenv
 from src.config.factory import create_app
+from src.modules.authentication.presentation.controllers.auth_controller import auth_bp
+from src.modules.authentication.presentation.controllers.user_controller import user_bp
+
 
 def load_environment():
     """Load the appropriate .env file based on FLASK_ENV."""
     env = os.getenv('FLASK_ENV', 'development')
     env_file = f'.env.{env}'
 
-    # Only load .env file if it exists (for local development)
     if os.path.exists(env_file):
         load_dotenv(env_file)
         print(f"✅ Loaded environment: {env} from {env_file}")
     else:
-        # In production (Render), env vars are already set - no file needed
         print(f"✅ Running in {env} mode - using system environment variables")
 
     return env
@@ -36,19 +37,14 @@ def create_application():
 
     print("=== Initializing Configuration System ===")
 
-    # Step 0: Load environment variables FIRST
     current_env = load_environment()
     print(f"📦 Environment: {current_env}")
     print(f"📦 App Version: {os.getenv('APP_VERSION', 'unknown')}")
 
-    configs = None
-
-    # Step 1: Generate stub file first
     if not ensure_config_ready():
         print("Failed to initialize config system. Exiting.")
         sys.exit(1)
 
-    # Step 2: Now safely import config sections
     try:
         from src.config.config import (
             application,
@@ -76,22 +72,18 @@ def create_application():
 
     print("\n=== Starting Flask Application ===")
 
-    # Custom error handling
-    error_handlers = []
-
-    # Blueprints
-    blueprints = []
+    blueprints = [auth_bp, user_bp]
 
     try:
-        # Create Flask app by passing config sections as parameters
         flask_app = create_app(
             Flask(__name__),
             configs=configs,
-            blueprints=blueprints,
-            error_handlers=error_handlers
+            blueprints=blueprints
         )
 
         print("✅ Flask application created successfully")
+        print("✅ Blueprints registered:", [bp.name for bp in blueprints])
+
         return flask_app
 
     except AttributeError as e:
