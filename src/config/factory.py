@@ -9,6 +9,8 @@ from datetime import timedelta
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager
 from flask_bcrypt import Bcrypt
+
+from src.modules.authentication.internal.ml_engineer_initializer import MLEngineerInitializer
 from src.shared.data.database import db
 from src.shared.exceptions.error_handlers import register_error_handlers
 
@@ -87,6 +89,7 @@ def create_app(flask_app, configs, blueprints=None):
     # Create all tables
     with app.app_context():
         db.create_all()
+        MLEngineerInitializer.initialize()
         app.logger.info("Database tables created successfully")
 
     # ============================================
