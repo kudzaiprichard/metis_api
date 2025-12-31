@@ -45,7 +45,10 @@ class UserService:
                 status=409
             )
             error.add_field_error("email", "Email already registered")
-            raise ConflictException(error_detail=error)
+            raise ConflictException(
+                message="This email is already registered",
+                error_detail=error
+            )
 
         # Create user
         user = User(
@@ -84,7 +87,10 @@ class UserService:
                 status=404,
                 details=[f"User with ID {request.user_id} does not exist"]
             )
-            raise NotFoundException(error_detail=error)
+            raise NotFoundException(
+                message="The user you're looking for doesn't exist",
+                error_detail=error
+            )
 
         return UserResponse.model_validate(user)
 
@@ -111,7 +117,10 @@ class UserService:
                 status=404,
                 details=[f"User with ID {request.user_id} does not exist"]
             )
-            raise NotFoundException(error_detail=error)
+            raise NotFoundException(
+                message="The user you're trying to update doesn't exist",
+                error_detail=error
+            )
 
         # Check email uniqueness if email is being updated
         if request.email and request.email != user.email:
@@ -123,7 +132,10 @@ class UserService:
                     status=409
                 )
                 error.add_field_error("email", "Email already in use")
-                raise ConflictException(error_detail=error)
+                raise ConflictException(
+                    message="This email is already in use by another user",
+                    error_detail=error
+                )
             user.email = request.email
 
         # Update fields
@@ -163,7 +175,10 @@ class UserService:
                 status=404,
                 details=[f"User with ID {request.user_id} does not exist"]
             )
-            raise NotFoundException(error_detail=error)
+            raise NotFoundException(
+                message="The user you're trying to delete doesn't exist",
+                error_detail=error
+            )
 
         # Soft delete
         self.user_repository.delete(user)
@@ -236,7 +251,10 @@ class UserService:
                 status=404,
                 details=[f"User with email {email} does not exist"]
             )
-            raise NotFoundException(error_detail=error)
+            raise NotFoundException(
+                message="No user found with this email address",
+                error_detail=error
+            )
 
         return UserResponse.model_validate(user)
 
@@ -263,7 +281,10 @@ class UserService:
                 status=404,
                 details=[f"User with ID {user_id} does not exist"]
             )
-            raise NotFoundException(error_detail=error)
+            raise NotFoundException(
+                message="The user you're trying to restore doesn't exist",
+                error_detail=error
+            )
 
         # Check if already active
         if not user.is_deleted:
@@ -273,7 +294,10 @@ class UserService:
                 status=400,
                 details=["User is not deleted"]
             )
-            raise ValidationException(error_detail=error)
+            raise ValidationException(
+                message="This user is already active",
+                error_detail=error
+            )
 
         # Restore user
         restored_user = self.user_repository.restore(user)

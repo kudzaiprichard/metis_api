@@ -19,15 +19,15 @@ class AppException(Exception):
             status=404,
             details=["User with ID 123 does not exist"]
         )
-        raise AppException(error_detail=error)
+        raise AppException(error_detail=error, message="The user could not be found")
     """
 
-    def __init__(self, message: str = "", error_detail: Optional[ErrorDetail] = None):
+    def __init__(self, message: str = "An error occurred", error_detail: Optional[ErrorDetail] = None):
         """
         Initialize exception with ErrorDetail.
 
         Args:
-            message: Short error message (optional, for logging)
+            message: User-friendly error message
             error_detail: ErrorDetail object with full error information
         """
         self.message = message
@@ -51,13 +51,16 @@ class NotFoundException(AppException):
             status=404,
             details=[f"User with ID {user_id} not found"]
         )
-        raise NotFoundException(error_detail=error)
+        raise NotFoundException(
+            message="The user you're looking for doesn't exist",
+            error_detail=error
+        )
 
-        # Or shorthand
-        raise NotFoundException(f"User {user_id} not found")
+        # Or shorthand with default message
+        raise NotFoundException()
     """
 
-    def __init__(self, message: str = "Resource not found", error_detail: Optional[ErrorDetail] = None):
+    def __init__(self, message: str = "The requested resource was not found", error_detail: Optional[ErrorDetail] = None):
         if error_detail is None:
             error_detail = ErrorDetail(
                 title="Not Found",
@@ -81,13 +84,16 @@ class ValidationException(AppException):
         )
         error.add_field_error("email", "Invalid format")
         error.add_field_error("password", "Too short")
-        raise ValidationException(error_detail=error)
+        raise ValidationException(
+            message="Please check your input and try again",
+            error_detail=error
+        )
 
         # Or shorthand
-        raise ValidationException("Invalid input data")
+        raise ValidationException()
     """
 
-    def __init__(self, message: str = "Validation failed", error_detail: Optional[ErrorDetail] = None):
+    def __init__(self, message: str = "Please check your input and try again", error_detail: Optional[ErrorDetail] = None):
         if error_detail is None:
             error_detail = ErrorDetail(
                 title="Validation Failed",
@@ -109,10 +115,13 @@ class AuthenticationException(AppException):
             status=401,
             details=["Invalid email or password"]
         )
-        raise AuthenticationException(error_detail=error)
+        raise AuthenticationException(
+            message="Please log in to continue",
+            error_detail=error
+        )
     """
 
-    def __init__(self, message: str = "Authentication required", error_detail: Optional[ErrorDetail] = None):
+    def __init__(self, message: str = "Please log in to continue", error_detail: Optional[ErrorDetail] = None):
         if error_detail is None:
             error_detail = ErrorDetail(
                 title="Authentication Failed",
@@ -134,10 +143,13 @@ class AuthorizationException(AppException):
             status=403,
             details=["Admin access required"]
         )
-        raise AuthorizationException(error_detail=error)
+        raise AuthorizationException(
+            message="You don't have permission to perform this action",
+            error_detail=error
+        )
     """
 
-    def __init__(self, message: str = "Access forbidden", error_detail: Optional[ErrorDetail] = None):
+    def __init__(self, message: str = "You don't have permission to perform this action", error_detail: Optional[ErrorDetail] = None):
         if error_detail is None:
             error_detail = ErrorDetail(
                 title="Access Denied",
@@ -159,10 +171,13 @@ class ConflictException(AppException):
             status=409
         )
         error.add_field_error("email", "Email already registered")
-        raise ConflictException(error_detail=error)
+        raise ConflictException(
+            message="This resource already exists",
+            error_detail=error
+        )
     """
 
-    def __init__(self, message: str = "Resource conflict", error_detail: Optional[ErrorDetail] = None):
+    def __init__(self, message: str = "This resource already exists", error_detail: Optional[ErrorDetail] = None):
         if error_detail is None:
             error_detail = ErrorDetail(
                 title="Conflict",
@@ -184,10 +199,13 @@ class BadRequestException(AppException):
             status=400,
             details=["Missing required field: user_id"]
         )
-        raise BadRequestException(error_detail=error)
+        raise BadRequestException(
+            message="Your request could not be processed",
+            error_detail=error
+        )
     """
 
-    def __init__(self, message: str = "Bad request", error_detail: Optional[ErrorDetail] = None):
+    def __init__(self, message: str = "Your request could not be processed", error_detail: Optional[ErrorDetail] = None):
         if error_detail is None:
             error_detail = ErrorDetail(
                 title="Bad Request",
@@ -209,10 +227,13 @@ class InternalServerException(AppException):
             status=500,
             details=["Could not connect to database"]
         )
-        raise InternalServerException(error_detail=error)
+        raise InternalServerException(
+            message="Something went wrong. Please try again later",
+            error_detail=error
+        )
     """
 
-    def __init__(self, message: str = "Internal server error", error_detail: Optional[ErrorDetail] = None):
+    def __init__(self, message: str = "Something went wrong. Please try again later", error_detail: Optional[ErrorDetail] = None):
         if error_detail is None:
             error_detail = ErrorDetail(
                 title="Internal Server Error",
@@ -234,10 +255,13 @@ class ServiceUnavailableException(AppException):
             status=503,
             details=["Payment service is temporarily unavailable"]
         )
-        raise ServiceUnavailableException(error_detail=error)
+        raise ServiceUnavailableException(
+            message="The service is temporarily unavailable. Please try again later",
+            error_detail=error
+        )
     """
 
-    def __init__(self, message: str = "Service unavailable", error_detail: Optional[ErrorDetail] = None):
+    def __init__(self, message: str = "The service is temporarily unavailable. Please try again later", error_detail: Optional[ErrorDetail] = None):
         if error_detail is None:
             error_detail = ErrorDetail(
                 title="Service Unavailable",
@@ -261,7 +285,7 @@ def create_exception(
 
     Args:
         exception_type: Type of exception ('not_found', 'validation', 'auth', etc.)
-        message: Error message
+        message: User-friendly error message
         code: Error code (optional)
         details: List of detail messages (optional)
         field_errors: Field-specific errors (optional)
@@ -269,14 +293,14 @@ def create_exception(
     Usage:
         raise create_exception(
             'not_found',
-            'User not found',
+            'The user you are looking for does not exist',
             code='USER_NOT_FOUND',
             details=['User with ID 123 does not exist']
         )
 
         raise create_exception(
             'validation',
-            'Validation failed',
+            'Please check your input and try again',
             code='VALIDATION_ERROR',
             field_errors={'email': ['Invalid format']}
         )
@@ -298,7 +322,7 @@ def create_exception(
     )
 
     error_detail = ErrorDetail(
-        title=message,
+        title=message if not details else details[0],
         code=code or default_code,
         status=status,
         details=details,

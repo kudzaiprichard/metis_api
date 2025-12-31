@@ -66,7 +66,10 @@ class JwtService:
                     status=401,
                     details=[f"Expected {token_type.value} token"]
                 )
-                raise AuthenticationException(error_detail=error)
+                raise AuthenticationException(
+                    message="Invalid token type provided",
+                    error_detail=error
+                )
 
             # Check token exists in database
             token_record = self.token_repository.find_by_token(token)
@@ -77,7 +80,10 @@ class JwtService:
                     status=401,
                     details=["Token does not exist in system"]
                 )
-                raise AuthenticationException(error_detail=error)
+                raise AuthenticationException(
+                    message="Your session could not be verified",
+                    error_detail=error
+                )
 
             # Verify token is still valid (not revoked/expired)
             if not token_record.is_valid():
@@ -87,7 +93,10 @@ class JwtService:
                     status=401,
                     details=["Token has been revoked or expired"]
                 )
-                raise AuthenticationException(error_detail=error)
+                raise AuthenticationException(
+                    message="Your session has expired. Please log in again",
+                    error_detail=error
+                )
 
             return payload
 
@@ -104,7 +113,10 @@ class JwtService:
                 status=401,
                 details=["Token has expired, please login again"]
             )
-            raise AuthenticationException(error_detail=error)
+            raise AuthenticationException(
+                message="Your session has expired. Please log in again",
+                error_detail=error
+            )
 
         except jwt.InvalidSignatureError:
             error = ErrorDetail(
@@ -113,7 +125,10 @@ class JwtService:
                 status=401,
                 details=["Token signature is invalid"]
             )
-            raise AuthenticationException(error_detail=error)
+            raise AuthenticationException(
+                message="Your session is invalid. Please log in again",
+                error_detail=error
+            )
 
         except jwt.DecodeError:
             error = ErrorDetail(
@@ -122,7 +137,10 @@ class JwtService:
                 status=401,
                 details=["Token could not be decoded"]
             )
-            raise AuthenticationException(error_detail=error)
+            raise AuthenticationException(
+                message="Your session could not be verified. Please log in again",
+                error_detail=error
+            )
 
         except jwt.InvalidTokenError as e:
             error = ErrorDetail(
@@ -131,7 +149,10 @@ class JwtService:
                 status=401,
                 details=[f"Token validation failed: {str(e)}"]
             )
-            raise AuthenticationException(error_detail=error)
+            raise AuthenticationException(
+                message="Your session is invalid. Please log in again",
+                error_detail=error
+            )
 
         except AuthenticationException:
             # Re-raise our custom exceptions
@@ -145,7 +166,10 @@ class JwtService:
                 status=401,
                 details=[f"Unexpected error during token validation: {str(e)}"]
             )
-            raise AuthenticationException(error_detail=error)
+            raise AuthenticationException(
+                message="Your session could not be verified. Please log in again",
+                error_detail=error
+            )
 
     def revoke_token(self, token: str) -> None:
         """
@@ -166,7 +190,10 @@ class JwtService:
                 status=400,
                 details=["Token does not exist"]
             )
-            raise ValidationException(error_detail=error)
+            raise ValidationException(
+                message="The token could not be found",
+                error_detail=error
+            )
 
         token_record.is_revoked = True
         self.token_repository.update(token_record)
@@ -217,7 +244,10 @@ class JwtService:
                 status=401,
                 details=["Token does not belong to this user"]
             )
-            raise AuthenticationException(error_detail=error)
+            raise AuthenticationException(
+                message="This token doesn't belong to your account",
+                error_detail=error
+            )
 
         # Create new access token
         return self._create_token(user, TokenType.ACCESS)

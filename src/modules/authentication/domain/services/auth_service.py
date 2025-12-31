@@ -44,7 +44,10 @@ class AuthenticationService:
                 status=409
             )
             error.add_field_error("email", "Email already registered")
-            raise ConflictException(error_detail=error)
+            raise ConflictException(
+                message="This email is already registered",
+                error_detail=error
+            )
 
         # Create user
         user = User(
@@ -90,7 +93,10 @@ class AuthenticationService:
                 status=401,
                 details=["Invalid email or password"]
             )
-            raise AuthenticationException(error_detail=error)
+            raise AuthenticationException(
+                message="Invalid email or password. Please try again",
+                error_detail=error
+            )
 
         # Revoke old tokens and generate new ones
         self.jwt_service.revoke_all_user_tokens(user.id)
@@ -145,7 +151,10 @@ class AuthenticationService:
                 status=404,
                 details=["User associated with token not found"]
             )
-            raise NotFoundException(error_detail=error)
+            raise NotFoundException(
+                message="Your account could not be found",
+                error_detail=error
+            )
 
         # Revoke old refresh token and generate new token pair
         self.jwt_service.revoke_token(refresh_token)
@@ -178,7 +187,10 @@ class AuthenticationService:
                 status=404,
                 details=["User associated with token not found"]
             )
-            raise NotFoundException(error_detail=error)
+            raise NotFoundException(
+                message="Your account could not be found",
+                error_detail=error
+            )
 
         # Convert to response DTO
         return UserResponse.model_validate(user)

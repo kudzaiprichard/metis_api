@@ -143,14 +143,14 @@ class PaginatedResponse(ApiResponse[List[T]]):
     def failure(
             cls,
             error: ErrorDetail,
-            message: Optional[str] = None
+            message: str
     ) -> 'PaginatedResponse[T]':
         """
         Create a failure paginated response.
 
         Args:
             error: Error detail object
-            message: Optional error message
+            message: User-friendly error message
 
         Returns:
             PaginatedResponse with error information

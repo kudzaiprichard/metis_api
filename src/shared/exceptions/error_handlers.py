@@ -59,7 +59,10 @@ def register_error_handlers(app: Flask) -> None:
             field = '.'.join(str(loc) for loc in error['loc'])
             error_detail.add_field_error(field, error['msg'])
 
-        response = ApiResponse.failure(error_detail)
+        response = ApiResponse.failure(
+            error_detail,
+            message="Please check your input and try again"
+        )
         return jsonify(response.to_dict()), 400
 
     @app.errorhandler(HTTPException)
@@ -75,7 +78,20 @@ def register_error_handlers(app: Flask) -> None:
             details=[e.description]
         )
 
-        response = ApiResponse.failure(error_detail)
+        # Map status codes to user-friendly messages
+        user_messages = {
+            400: "Please check your request and try again",
+            401: "Please log in to continue",
+            403: "You don't have permission to perform this action",
+            404: "The page you're looking for doesn't exist",
+            405: "This action is not allowed",
+            500: "Something went wrong. Please try again later",
+            503: "The service is temporarily unavailable"
+        }
+
+        message = user_messages.get(e.code, "An error occurred. Please try again")
+
+        response = ApiResponse.failure(error_detail, message=message)
         return jsonify(response.to_dict()), e.code
 
     @app.errorhandler(404)
@@ -88,7 +104,10 @@ def register_error_handlers(app: Flask) -> None:
             details=[f"The requested URL {request.path} was not found"]
         )
 
-        response = ApiResponse.failure(error_detail)
+        response = ApiResponse.failure(
+            error_detail,
+            message="The page you're looking for doesn't exist"
+        )
         return jsonify(response.to_dict()), 404
 
     @app.errorhandler(405)
@@ -101,7 +120,10 @@ def register_error_handlers(app: Flask) -> None:
             details=[f"Method {request.method} not allowed for {request.path}"]
         )
 
-        response = ApiResponse.failure(error_detail)
+        response = ApiResponse.failure(
+            error_detail,
+            message="This action is not allowed"
+        )
         return jsonify(response.to_dict()), 405
 
     @app.errorhandler(Exception)
@@ -120,5 +142,8 @@ def register_error_handlers(app: Flask) -> None:
             details=["An unexpected error occurred. Please try again later."]
         )
 
-        response = ApiResponse.failure(error_detail)
+        response = ApiResponse.failure(
+            error_detail,
+            message="Something went wrong. Please try again later"
+        )
         return jsonify(response.to_dict()), 500

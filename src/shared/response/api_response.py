@@ -69,7 +69,7 @@ class ApiResponse(Generic[T]):
         Convert response to dictionary format.
         Handles both Pydantic models (with .dict()) and regular objects (with .to_dict()).
         """
-        result: Dict[str, Any] = {}
+        result: Dict[str, Any] = {'success': self.is_success()}
 
         if self.error:
             result['error'] = self.error.to_dict()
@@ -121,13 +121,13 @@ class ApiResponse(Generic[T]):
         return cls(value=value, message=message)
 
     @classmethod
-    def failure(cls, error: ErrorDetail, message: Optional[str] = None) -> 'ApiResponse[T]':
+    def failure(cls, error: ErrorDetail, message: str) -> 'ApiResponse[T]':
         """
         Create a failure response.
 
         Args:
             error: Error detail object
-            message: Optional error message
+            message: User-friendly error message
 
         Returns:
             ApiResponse with error information
