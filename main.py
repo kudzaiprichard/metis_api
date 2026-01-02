@@ -7,6 +7,9 @@ from src.modules.authentication.presentation.controllers.auth_controller import 
 from src.modules.authentication.presentation.controllers.user_controller import user_bp
 from src.modules.patients.presentation.controller.patient_controller import patients_bp
 from src.modules.recommendation.presentation.controllers.recommendation_controller import recommendation_bp
+from src.modules.treatment_decisions.presentation.controllers.follow_up_controller import follow_up_bp
+from src.modules.treatment_decisions.presentation.controllers.timeline_controller import timeline_bp
+from src.modules.treatment_decisions.presentation.controllers.treatment_decision_controller import treatment_decision_bp
 
 
 def load_environment():
@@ -74,7 +77,9 @@ def create_application():
 
     print("\n=== Starting Flask Application ===")
 
-    blueprints = [auth_bp, user_bp, patients_bp, recommendation_bp]
+    blueprints = [auth_bp, user_bp, patients_bp,
+                  recommendation_bp, treatment_decision_bp,
+                  follow_up_bp, timeline_bp]
 
     try:
         flask_app = create_app(
