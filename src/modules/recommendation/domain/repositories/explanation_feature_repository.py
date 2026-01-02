@@ -1,6 +1,6 @@
 from typing import List
 
-from src.modules.recommendation.models.explanation_feature import ExplanationFeature
+from src.modules.recommendation.domain.models.explanation_feature import ExplanationFeature
 from src.shared.data.base.repository import BaseRepository
 
 

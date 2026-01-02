@@ -1,4 +1,4 @@
-from src.modules.recommendation.models.enums import SafetySeverity
+from src.modules.recommendation.domain.models.enums import SafetySeverity
 from src.shared.data.base.model import BaseModel
 from src.shared.data.database import db
 

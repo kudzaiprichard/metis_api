@@ -1,7 +1,7 @@
 from typing import List
 
-from src.modules.recommendation.models.enums import SafetySeverity
-from src.modules.recommendation.models.safety_warning import SafetyWarning
+from src.modules.recommendation.domain.models.enums import SafetySeverity
+from src.modules.recommendation.domain.models.safety_warning import SafetyWarning
 from src.shared.data.base.repository import BaseRepository
 
 

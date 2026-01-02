@@ -1,6 +1,6 @@
 from typing import List
 
-from src.modules.recommendation.models.prediction_q_value import PredictionQValue
+from src.modules.recommendation.domain.models.prediction_q_value import PredictionQValue
 from src.shared.data.base.repository import BaseRepository
 
 

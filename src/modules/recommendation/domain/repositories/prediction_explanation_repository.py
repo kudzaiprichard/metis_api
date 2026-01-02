@@ -1,6 +1,6 @@
 from typing import Optional
 
-from src.modules.recommendation.models.prediction_explanation import PredictionExplanation
+from src.modules.recommendation.domain.models.prediction_explanation import PredictionExplanation
 from src.shared.data.base.repository import BaseRepository
 
 
