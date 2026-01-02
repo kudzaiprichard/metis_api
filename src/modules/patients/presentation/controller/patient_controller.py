@@ -13,7 +13,7 @@ from src.modules.patients.presentation.dtos.patient_dtos import (
 from src.shared.response.api_response import ApiResponse
 
 # Create blueprint
-patient_medical_data_bp = Blueprint('patient_medical_data', __name__, url_prefix='/api/v1/patients')
+patients_bp = Blueprint('patients', __name__, url_prefix='/api/v1/patients')
 
 # Initialize service
 medical_data_service = PatientMedicalDataService()
@@ -23,7 +23,7 @@ medical_data_service = PatientMedicalDataService()
 # CREATE PATIENT MEDICAL DATA ENDPOINT
 # =============================================================================
 
-@patient_medical_data_bp.route('/<string:patient_id>/medical-data', methods=['POST'])
+@patients_bp.route('/<string:patient_id>/medical-data', methods=['POST'])
 @jwt_auth.jwt_access_required
 @jwt_auth.role_required('DOCTOR')
 def create_medical_data(patient_id):
@@ -47,7 +47,7 @@ def create_medical_data(patient_id):
 # GET PATIENT MEDICAL DATA ENDPOINT
 # =============================================================================
 
-@patient_medical_data_bp.route('/<string:patient_id>/medical-data', methods=['GET'])
+@patients_bp.route('/<string:patient_id>/medical-data', methods=['GET'])
 @jwt_auth.jwt_access_required
 @jwt_auth.role_required('DOCTOR')
 def get_medical_data(patient_id):
@@ -66,7 +66,7 @@ def get_medical_data(patient_id):
 # UPDATE PATIENT MEDICAL DATA ENDPOINT
 # =============================================================================
 
-@patient_medical_data_bp.route('/<string:patient_id>/medical-data', methods=['PUT'])
+@patients_bp.route('/<string:patient_id>/medical-data', methods=['PUT'])
 @jwt_auth.jwt_access_required
 @jwt_auth.role_required('DOCTOR')
 def update_medical_data(patient_id):
@@ -87,7 +87,7 @@ def update_medical_data(patient_id):
 # DELETE PATIENT MEDICAL DATA ENDPOINT
 # =============================================================================
 
-@patient_medical_data_bp.route('/<string:patient_id>/medical-data', methods=['DELETE'])
+@patients_bp.route('/<string:patient_id>/medical-data', methods=['DELETE'])
 @jwt_auth.jwt_access_required
 @jwt_auth.role_required('DOCTOR')
 def delete_medical_data(patient_id):
