@@ -6,6 +6,7 @@ from src.config.factory import create_app
 from src.modules.authentication.presentation.controllers.auth_controller import auth_bp
 from src.modules.authentication.presentation.controllers.user_controller import user_bp
 from src.modules.patients.presentation.controller.patient_controller import patients_bp
+from src.modules.recommendation.presentation.controllers.recommendation_controller import recommendation_bp
 
 
 def load_environment():
@@ -73,7 +74,7 @@ def create_application():
 
     print("\n=== Starting Flask Application ===")
 
-    blueprints = [auth_bp, user_bp, patients_bp]
+    blueprints = [auth_bp, user_bp, patients_bp, recommendation_bp]
 
     try:
         flask_app = create_app(
