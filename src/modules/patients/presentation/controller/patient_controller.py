@@ -6,17 +6,22 @@ from flask import Blueprint, request, jsonify
 
 from src.config.auth_setup import jwt_auth
 from src.modules.patients.domain.services.patient_medical_data_service import PatientMedicalDataService
+from src.modules.patients.domain.services.patient_service import PatientService
 from src.modules.patients.presentation.dtos.patient_dtos import (
     CreatePatientMedicalDataRequest,
-    UpdatePatientMedicalDataRequest
+    UpdatePatientMedicalDataRequest, ListPatientsRequest, CreatePatientRequest, GetPatientRequest,
+    UpdatePatientContactRequest, DeletePatientRequest
 )
 from src.shared.response.api_response import ApiResponse
+from src.shared.response.paginated_response import PaginatedResponse
 
 # Create blueprint
 patients_bp = Blueprint('patients', __name__, url_prefix='/api/v1/patients')
 
 # Initialize service
 medical_data_service = PatientMedicalDataService()
+patient_service = PatientService()
+
 
 
 # =============================================================================
@@ -97,6 +102,135 @@ def delete_medical_data(patient_id):
     response = ApiResponse.success(
         value={"deleted": True, "patient_id": patient_id},
         message="Medical data deleted successfully"
+    )
+
+    return jsonify(response.to_dict()), 200
+
+# =============================================================================
+# PATIENT CRUD ENDPOINTS
+# =============================================================================
+
+@patients_bp.route('', methods=['GET'])
+@jwt_auth.jwt_access_required
+@jwt_auth.role_required('DOCTOR')
+def list_patients():
+    """List patients with pagination and optional search."""
+    request_dto = ListPatientsRequest(
+        page=request.args.get('page', 1, type=int),
+        per_page=request.args.get('per_page', 20, type=int),
+        search=request.args.get('search', None)
+    )
+
+    patients, total = patient_service.list_patients(request_dto)
+
+    patients_data = [patient.model_dump() for patient in patients]
+
+    response = PaginatedResponse.success(
+        value=patients_data,
+        page=request_dto.page,
+        total=total,
+        page_size=request_dto.per_page,
+        message="Patients retrieved successfully"
+    )
+
+    return jsonify(response.to_dict()), 200
+
+
+@patients_bp.route('', methods=['POST'])
+@jwt_auth.jwt_access_required
+@jwt_auth.role_required('DOCTOR')
+def create_patient():
+    """Create a new patient."""
+    request_dto = CreatePatientRequest(**request.json)
+
+    patient_dto = patient_service.create_patient(request_dto)
+
+    response = ApiResponse.success(
+        value=patient_dto.model_dump(),
+        message="Patient created successfully"
+    )
+
+    return jsonify(response.to_dict()), 201
+
+
+@patients_bp.route('/<string:patient_id>', methods=['GET'])
+@jwt_auth.jwt_access_required
+@jwt_auth.role_required('DOCTOR')
+def get_patient(patient_id):
+    """Get a single patient by ID."""
+    request_dto = GetPatientRequest(patient_id=patient_id)
+
+    patient_dto = patient_service.get_patient(request_dto)
+
+    response = ApiResponse.success(
+        value=patient_dto.model_dump(),
+        message="Patient retrieved successfully"
+    )
+
+    return jsonify(response.to_dict()), 200
+
+
+@patients_bp.route('/<string:patient_id>/detail', methods=['GET'])
+@jwt_auth.jwt_access_required
+@jwt_auth.role_required('DOCTOR')
+def get_patient_detail(patient_id):
+    """Get patient with medical data."""
+    request_dto = GetPatientRequest(patient_id=patient_id)
+
+    patient_dto = patient_service.get_patient_detail(request_dto)
+
+    response = ApiResponse.success(
+        value=patient_dto.model_dump(),
+        message="Patient details retrieved successfully"
+    )
+
+    return jsonify(response.to_dict()), 200
+
+
+@patients_bp.route('/<string:patient_id>', methods=['PUT'])
+@jwt_auth.jwt_access_required
+@jwt_auth.role_required('DOCTOR')
+def update_patient(patient_id):
+    """Update patient contact information."""
+    request_dto = UpdatePatientContactRequest(**request.json)
+
+    patient_dto = patient_service.update_patient_contact(patient_id, request_dto)
+
+    response = ApiResponse.success(
+        value=patient_dto.model_dump(),
+        message="Patient updated successfully"
+    )
+
+    return jsonify(response.to_dict()), 200
+
+
+@patients_bp.route('/<string:patient_id>', methods=['DELETE'])
+@jwt_auth.jwt_access_required
+@jwt_auth.role_required('DOCTOR')
+def delete_patient(patient_id):
+    """Soft delete a patient."""
+    request_dto = DeletePatientRequest(patient_id=patient_id)
+
+    patient_service.delete_patient(request_dto)
+
+    response = ApiResponse.success(
+        value={"deleted": True, "patient_id": patient_id},
+        message="Patient deleted successfully"
+    )
+
+    return jsonify(response.to_dict()), 200
+
+
+@patients_bp.route('/<string:patient_id>/restore', methods=['POST'])
+@jwt_auth.jwt_access_required
+@jwt_auth.role_required('DOCTOR')
+def restore_patient(patient_id):
+    """Restore a soft-deleted patient."""
+    patient_dto = patient_service.restore_patient(patient_id)
+
+    response = ApiResponse.success(
+        value=patient_dto.model_dump(),
+        message="Patient restored successfully"
     )
 
     return jsonify(response.to_dict()), 200
