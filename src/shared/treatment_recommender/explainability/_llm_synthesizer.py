@@ -283,12 +283,12 @@ Generate a comprehensive clinical explanation in the EXACT JSON format specified
       "Monitoring action 2"
     ]
   }},
-  "alternatives_explanation": {{
+   "alternatives_explanation": {{
     "why_not_alternatives": "2-3 sentences explaining why other treatments weren't chosen",
     "alternatives": [
       {{
         "rank": 2,
-        "treatment": "Treatment name",
+        "treatment": "METFORMIN|GLP-1|SGLT-2|DPP-4|INSULIN",  // USE EXACT NAMES
         "predicted_reduction": 0.0,
         "pros": ["Pro 1", "Pro 2"],
         "cons": ["Con 1", "Con 2"],
@@ -297,6 +297,13 @@ Generate a comprehensive clinical explanation in the EXACT JSON format specified
     ]
   }}
 }}
+
+**CRITICAL: For the "treatment" field in alternatives, you MUST use ONLY these exact values:**
+- METFORMIN
+- GLP-1
+- SGLT-2
+- DPP-4
+- INSULIN
 
 Be concise, clinical, and evidence-based. Respond with ONLY the JSON object, nothing else.
 """

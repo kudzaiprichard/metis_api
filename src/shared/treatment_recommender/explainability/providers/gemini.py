@@ -119,38 +119,35 @@ class GeminiProvider(BaseLLMProvider):
 
         try:
             # Configure generation
-            generation_config = types.GenerateContentConfig(
+            config = types.GenerateContentConfig(
                 temperature=temperature,
                 top_p=0.95,
                 top_k=40,
+                safety_settings=[
+                    types.SafetySetting(
+                        category='HARM_CATEGORY_HARASSMENT',
+                        threshold='BLOCK_NONE'
+                    ),
+                    types.SafetySetting(
+                        category='HARM_CATEGORY_HATE_SPEECH',
+                        threshold='BLOCK_NONE'
+                    ),
+                    types.SafetySetting(
+                        category='HARM_CATEGORY_SEXUALLY_EXPLICIT',
+                        threshold='BLOCK_NONE'
+                    ),
+                    types.SafetySetting(
+                        category='HARM_CATEGORY_DANGEROUS_CONTENT',
+                        threshold='BLOCK_NONE'
+                    ),
+                ]
             )
-
-            # Safety settings - allow all for medical content
-            safety_settings = [
-                types.SafetySetting(
-                    category='HARM_CATEGORY_HARASSMENT',
-                    threshold='BLOCK_NONE'
-                ),
-                types.SafetySetting(
-                    category='HARM_CATEGORY_HATE_SPEECH',
-                    threshold='BLOCK_NONE'
-                ),
-                types.SafetySetting(
-                    category='HARM_CATEGORY_SEXUALLY_EXPLICIT',
-                    threshold='BLOCK_NONE'
-                ),
-                types.SafetySetting(
-                    category='HARM_CATEGORY_DANGEROUS_CONTENT',
-                    threshold='BLOCK_NONE'
-                ),
-            ]
 
             # Generate content
             response = self.client.models.generate_content(
                 model=model,
                 contents=prompt,
-                config=generation_config,
-                safety_settings=safety_settings
+                config=config
             )
 
             # Extract text
