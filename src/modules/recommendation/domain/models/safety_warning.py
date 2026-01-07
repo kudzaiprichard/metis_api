@@ -2,6 +2,7 @@ from src.modules.recommendation.domain.models.enums import SafetySeverity
 from src.shared.data.base.model import BaseModel
 from src.shared.data.database import db
 
+
 class SafetyWarning(BaseModel):
     """
     Stores safety checks and contraindications.
@@ -16,6 +17,7 @@ class SafetyWarning(BaseModel):
     concern = db.Column(db.Text, nullable=False)  # What the concern is
     patient_factor = db.Column(db.String(100), nullable=False)  # Relevant patient factor
     mitigation = db.Column(db.Text, nullable=False)  # How to address the concern
+    reason = db.Column(db.Text, nullable=True)
 
     def to_dict(self, exclude: list = None) -> dict:
         """Override to handle enum serialization and datetime conversion."""
