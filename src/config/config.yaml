@@ -43,12 +43,28 @@ database:
   echo: ${DB_ECHO}
   pool_pre_ping: true
 
-# External API keys
-integrations: # Todo configure LLM integration later
-#  ai:
-#    gemini:
-#      api_key: ${GEMINI_API_KEY}
-#      model: "gemini-flash"
+# External API keys & ML Configuration
+integrations:
+  ai:
+    gemini:
+      api_key: ${GEMINI_API_KEY}
+      model: ${GEMINI_MODEL_NAME}
+
+  ml_model:
+    # Model paths
+    models_dir: ${ML_MODELS_DIR}
+    scaler_path: ${ML_SCALER_PATH}
+    preprocessing_metadata_path: ${ML_PREPROCESSING_METADATA_PATH}
+
+    # Model settings
+    model_version: ${ML_MODEL_VERSION}  # Empty = use active version
+    auto_activate: ${ML_AUTO_ACTIVATE}
+    verbose: ${ML_VERBOSE}
+
+  graph_database:
+    uri: ${NEO4J_URI}
+    username: ${NEO4J_USERNAME}
+    password: ${NEO4J_PASSWORD}
 
 # Logging configuration
 logging:
