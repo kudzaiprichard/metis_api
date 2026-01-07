@@ -2,10 +2,11 @@
 Google Gemini provider for explainability system.
 
 This module provides integration with Google's Gemini API for
-generating clinical explanations using the official google-generativeai SDK.
+generating clinical explanations using the official google-genai SDK.
 """
 from typing import Optional
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 
 from ._base import (
     BaseLLMProvider,
@@ -27,12 +28,12 @@ class GeminiProvider(BaseLLMProvider):
     """
     Google Gemini LLM provider for clinical explanation generation.
 
-    Uses the official google-generativeai Python SDK.
+    Uses the official google-genai Python SDK.
 
     Usage:
         provider = GeminiProvider(
             api_key='YOUR_GEMINI_API_KEY',
-            model_name='gemini-1.5-pro-latest'
+            model_name='gemini-2.0-flash-exp'
         )
 
         response = provider.generate_explanation(
@@ -44,7 +45,9 @@ class GeminiProvider(BaseLLMProvider):
         Get your API key from: https://aistudio.google.com/app/apikey
 
     Available Models:
-        See https://ai.google.dev/models/gemini for current model list
+        - gemini-2.0-flash-exp (latest)
+        - gemini-1.5-pro
+        - gemini-1.5-flash
     """
 
     def __init__(self,
@@ -57,7 +60,7 @@ class GeminiProvider(BaseLLMProvider):
 
         Args:
             api_key: Gemini API key (required)
-            model_name: Model to use (e.g., 'gemini-1.5-pro-latest') (required)
+            model_name: Model to use (e.g., 'gemini-2.0-flash-exp') (required)
             timeout: Request timeout in seconds
             verbose: If True, print detailed logs
 
@@ -70,8 +73,8 @@ class GeminiProvider(BaseLLMProvider):
         self.timeout = timeout
         self.verbose = verbose
 
-        # Configure SDK
-        genai.configure(api_key=self.api_key)
+        # Initialize client
+        self.client = genai.Client(api_key=self.api_key)
 
         # Initialize base class
         super().__init__(
@@ -115,38 +118,45 @@ class GeminiProvider(BaseLLMProvider):
             print(f"[GeminiProvider] Prompt length: {len(prompt)} chars")
 
         try:
-            # Create model instance
-            model_instance = genai.GenerativeModel(model)
-
-            # Configure generation - let the model use its default max tokens
-            generation_config = genai.GenerationConfig(
+            # Configure generation
+            generation_config = types.GenerateContentConfig(
                 temperature=temperature,
                 top_p=0.95,
                 top_k=40,
             )
 
             # Safety settings - allow all for medical content
-            from google.generativeai.types import HarmCategory, HarmBlockThreshold
-
             safety_settings = [
-                {"category": HarmCategory.HARM_CATEGORY_HARASSMENT, "threshold": HarmBlockThreshold.BLOCK_NONE},
-                {"category": HarmCategory.HARM_CATEGORY_HATE_SPEECH, "threshold": HarmBlockThreshold.BLOCK_NONE},
-                {"category": HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, "threshold": HarmBlockThreshold.BLOCK_NONE},
-                {"category": HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, "threshold": HarmBlockThreshold.BLOCK_NONE},
+                types.SafetySetting(
+                    category='HARM_CATEGORY_HARASSMENT',
+                    threshold='BLOCK_NONE'
+                ),
+                types.SafetySetting(
+                    category='HARM_CATEGORY_HATE_SPEECH',
+                    threshold='BLOCK_NONE'
+                ),
+                types.SafetySetting(
+                    category='HARM_CATEGORY_SEXUALLY_EXPLICIT',
+                    threshold='BLOCK_NONE'
+                ),
+                types.SafetySetting(
+                    category='HARM_CATEGORY_DANGEROUS_CONTENT',
+                    threshold='BLOCK_NONE'
+                ),
             ]
 
             # Generate content
-            response = model_instance.generate_content(
-                prompt,
-                generation_config=generation_config,
-                safety_settings=safety_settings,
-                request_options=genai.types.RequestOptions(timeout=self.timeout)
+            response = self.client.models.generate_content(
+                model=model,
+                contents=prompt,
+                config=generation_config,
+                safety_settings=safety_settings
             )
 
             # Extract text
             if not response.text:
                 # Check if blocked
-                if hasattr(response, 'prompt_feedback'):
+                if hasattr(response, 'prompt_feedback') and response.prompt_feedback:
                     block_reason = response.prompt_feedback.block_reason
                     raise InvalidResponseError(f"Content blocked: {block_reason}")
 
@@ -199,7 +209,7 @@ class GeminiProvider(BaseLLMProvider):
                 if success:
                     print("[GeminiProvider] ✓ Connection test passed")
                 else:
-                    print("[GeminiProvider] ✗ Connection test passed")
+                    print("[GeminiProvider] ✗ Connection test failed")
 
             return success
 
@@ -222,7 +232,7 @@ def create_gemini_provider(api_key: str,
 
     Args:
         api_key: Gemini API key (required)
-        model_name: Model to use (e.g., 'gemini-1.5-pro-latest') (required)
+        model_name: Model to use (e.g., 'gemini-2.0-flash-exp') (required)
         timeout: Request timeout in seconds
         verbose: Enable detailed logging
 
@@ -232,7 +242,7 @@ def create_gemini_provider(api_key: str,
     Example:
         provider = create_gemini_provider(
             api_key='YOUR_KEY',
-            model_name='gemini-1.5-pro-latest'
+            model_name='gemini-2.0-flash-exp'
         )
     """
     return GeminiProvider(
