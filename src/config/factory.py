@@ -145,10 +145,10 @@ def create_app(flask_app, configs, blueprints=None):
     app.logger.setLevel(log_level)
 
     # Silence verbose third-party loggers
-    python_logging.getLogger('neo4j').setLevel(python_logging.WARNING)
-    python_logging.getLogger('neo4j.pool').setLevel(python_logging.WARNING)
-    python_logging.getLogger('neo4j.io').setLevel(python_logging.WARNING)
-    python_logging.getLogger('neo4j.routing').setLevel(python_logging.WARNING)
+    python_logging.getLogger('neo4j').setLevel(python_logging.ERROR)
+    python_logging.getLogger('neo4j.pool').setLevel(python_logging.ERROR)
+    python_logging.getLogger('neo4j.io').setLevel(python_logging.ERROR)
+    python_logging.getLogger('neo4j.routing').setLevel(python_logging.ERROR)
 
     # ============================================
     # Neo4j Configuration

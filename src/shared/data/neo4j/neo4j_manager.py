@@ -57,9 +57,7 @@ class Neo4jManager:
         # Validate configuration exists
         neo4j_config = app.config.get('NEO4J_CONFIG')
         if not neo4j_config:
-            error_msg = "CRITICAL: Neo4j configuration not found in app config"
-            app.logger.error(error_msg)
-            raise RuntimeError(error_msg)
+            raise RuntimeError("Neo4j configuration not found in app config")
 
         self._config = neo4j_config
 
@@ -82,7 +80,7 @@ class Neo4jManager:
             if not self._neo4j_db.connect():
                 raise RuntimeError(
                     f"Failed to connect to Neo4j at {neo4j_config['uri']}. "
-                    "Connection returned False."
+                    "Ensure Neo4j is running and credentials are correct."
                 )
 
             # Verify connection with test query
@@ -94,20 +92,9 @@ class Neo4jManager:
             app.logger.info("=" * 80)
 
         except Exception as e:
-            error_msg = (
-                f"CRITICAL: Neo4j initialization failed: {str(e)}\n"
-                f"Attempted connection to: {neo4j_config['uri']}\n"
-                f"Username: {neo4j_config['username']}\n\n"
-                f"TROUBLESHOOTING:\n"
-                f"1. Verify Neo4j is running: docker ps | grep neo4j\n"
-                f"2. Check Neo4j URI is correct: {neo4j_config['uri']}\n"
-                f"3. Verify credentials are correct\n"
-                f"4. Check firewall/network connectivity\n"
-                f"5. Review Neo4j logs for errors\n"
-            )
-            app.logger.error(error_msg)
+            # Clean error message - no verbose troubleshooting
             self._neo4j_db = None
-            raise RuntimeError(error_msg)
+            raise RuntimeError(f"Neo4j initialization failed: {str(e)}")
 
     def _verify_connection(self):
         """
@@ -137,9 +124,8 @@ class Neo4jManager:
         """
         if self._neo4j_db is None:
             raise RuntimeError(
-                "CRITICAL: Neo4j database not initialized. "
-                "This should not happen if application startup succeeded. "
-                "System state is inconsistent."
+                "Neo4j database not initialized. "
+                "This should not happen if application startup succeeded."
             )
         return self._neo4j_db
 

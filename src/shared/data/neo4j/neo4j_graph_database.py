@@ -59,8 +59,8 @@ class Neo4jGraphDatabase(GraphDatabaseInterface):
             self._connected = True
             logger.info("Connected to Neo4j for explainability")
             return True
-        except Exception as e:
-            logger.error(f"Failed to connect to Neo4j: {str(e)}")
+        except Exception:
+            # Don't log here - let caller handle error messaging
             self._connected = False
             return False
 
