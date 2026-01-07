@@ -396,6 +396,7 @@ class SafetyWarning:
     concern: str
     patient_factor: str
     mitigation: str
+    reason: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary."""
@@ -403,7 +404,8 @@ class SafetyWarning:
             "severity": self.severity,
             "concern": self.concern,
             "patient_factor": self.patient_factor,
-            "mitigation": self.mitigation
+            "mitigation": self.mitigation,
+            "reason": self.reason
         }
 
 

@@ -394,10 +394,13 @@ class PredictionService:
                 saved_alternatives = self.alternative_repository.create_many(alternative_records)
 
         # ============================================
-        # 10. CREATE SAFETY WARNINGS
+        # 10. CREATE SAFETY WARNINGS (SIMPLIFIED!)
         # ============================================
+
+        # with reasons already populated
         saved_warnings = []
         warning_records = []
+
         for warn in ai_result.get('safety_warnings', []):
             warning = SafetyWarning(
                 prediction_id=saved_prediction.id,
@@ -405,9 +408,10 @@ class PredictionService:
                 concern=warn['concern'],
                 patient_factor=warn['patient_factor'],
                 mitigation=warn['mitigation'],
-                reason=warn.get('reason')
+                reason=warn.get('reason')  # Already populated by synthesizer!
             )
             warning_records.append(warning)
+
         if warning_records:
             saved_warnings = self.safety_warning_repository.create_many(warning_records)
 
@@ -454,12 +458,12 @@ class PredictionService:
         # Build explanation structure
         explanation_dict = None
         if explanation_result:
-            # Extract top features
+            # Extract top features with CORRECT scaled_value
             top_features = []
             for feat in explanation_result.feature_importance.top_features[:5]:
                 top_features.append({
                     'feature_name': feat.feature,
-                    'scaled_value': 0.0,  # Not directly exposed by module
+                    'scaled_value': feat.value,
                     'raw_value': feat.raw_value,
                     'shap_value': feat.shap_value,
                     'rank': feat.importance_rank,
@@ -479,7 +483,7 @@ class PredictionService:
                     'when_to_consider': alt.when_to_consider
                 })
 
-            # Get feature interactions text (use first key factor as proxy)
+            # Get feature interactions text
             feature_interactions = None
             if explanation_result.model_reasoning.key_factors:
                 feature_interactions = explanation_result.model_reasoning.key_factors[0].evidence
@@ -490,64 +494,24 @@ class PredictionService:
                 'clinical_priority': explanation_result.summary.clinical_priority,
                 'why_this_treatment': explanation_result.model_reasoning.why_this_treatment,
                 'why_not_alternatives': explanation_result.alternatives.why_not_alternatives,
-                'base_value': 0.0,  # Not directly exposed
+                'base_value': explanation_result.feature_importance.base_value,
                 'prediction_value': prediction_result.predicted_hba1c_reduction,
                 'feature_interactions': feature_interactions,
                 'top_features': top_features,
                 'alternatives': alternatives
             }
 
-        # Build safety warnings with only concern and reason
+        # Build safety warnings (already processed by synthesizer with reasons!)
         safety_warnings = []
         if explanation_result and explanation_result.safety_checks.warnings:
             for warning in explanation_result.safety_checks.warnings:
                 safety_warnings.append({
                     'severity': warning.severity,
                     'concern': warning.concern,
-                    'patient_factor': 'N/A',
+                    'patient_factor': warning.patient_factor,
                     'mitigation': warning.mitigation,
-                    'reason': None
+                    'reason': warning.reason
                 })
-
-        # Add contraindications as critical warnings (with reason only)
-        if explanation_result and explanation_result.safety_checks.contraindications:
-            for contra in explanation_result.safety_checks.contraindications:
-                if isinstance(contra, dict):
-                    # Already a dict - extract concern and reason, use alternative as mitigation
-                    safety_warnings.append({
-                        'severity': contra.get('severity', 'critical'),
-                        'concern': contra.get('condition', 'Unknown contraindication'),
-                        'patient_factor': 'Contraindication',
-                        'mitigation': contra.get('alternative', 'Consult physician'),
-                        'reason': contra.get('reason')
-                    })
-                elif isinstance(contra, str):
-                    # Try to parse if it's a string representation of dict
-                    try:
-                        contra_dict = json.loads(contra.replace("'", '"'))
-                        safety_warnings.append({
-                            'severity': contra_dict.get('severity', 'critical'),
-                            'concern': contra_dict.get('condition', 'Unknown contraindication'),
-                            'patient_factor': 'Contraindication',
-                            'mitigation': contra_dict.get('alternative', 'Consult physician'),
-                            'reason': contra_dict.get('reason')
-                        })
-                    except:
-                        safety_warnings.append({
-                            'severity': 'critical',
-                            'concern': str(contra),
-                            'patient_factor': 'Contraindication',
-                            'mitigation': 'Consult physician before use',
-                            'reason': None
-                        })
-                else:
-                    safety_warnings.append({
-                        'severity': 'critical',
-                        'concern': str(contra),
-                        'patient_factor': 'Contraindication',
-                        'mitigation': 'Consult physician before use',
-                        'reason': None
-                    })
 
         return {
             'model_version': model_version,
