@@ -34,7 +34,7 @@ class PredictionExplanation(BaseModel):
                                    cascade='all, delete-orphan')
 
     def to_dict(self, exclude: list = None) -> dict:
-        """Override to handle enum serialization and datetime conversion."""
+        """Override to handle enum serialization, datetime conversion, and relationships."""
         data = super().to_dict(exclude=exclude)
 
         # Handle enum serialization
@@ -50,6 +50,10 @@ class PredictionExplanation(BaseModel):
             data['created_at'] = self.created_at.isoformat()
         if 'updated_at' in data and self.updated_at:
             data['updated_at'] = self.updated_at.isoformat()
+
+        # Load relationships (lazy='dynamic' returns query, need .all())
+        data['features'] = [f.to_dict() for f in self.features.all()]
+        data['alternatives'] = [a.to_dict() for a in self.alternatives.all()]
 
         return data
 

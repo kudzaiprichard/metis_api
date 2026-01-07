@@ -33,19 +33,24 @@ class Prediction(BaseModel):
                                       cascade='all, delete-orphan')
 
     def to_dict(self, exclude: list = None) -> dict:
-        """Override to handle enum serialization and datetime conversion."""
+        """Override to handle enum serialization, datetime conversion, and relationships."""
         data = super().to_dict(exclude=exclude)
 
         # Handle enum serialization
         if 'recommended_treatment' in data:
-            data['recommended_treatment'] = self.recommended_treatment.value if hasattr(self.recommended_treatment,
-                                                                                        'value') else self.recommended_treatment
+            data['recommended_treatment'] = self.recommended_treatment.value if hasattr(
+                self.recommended_treatment, 'value') else self.recommended_treatment
 
         # Handle datetime serialization
         if 'created_at' in data and self.created_at:
             data['created_at'] = self.created_at.isoformat()
         if 'updated_at' in data and self.updated_at:
             data['updated_at'] = self.updated_at.isoformat()
+
+        # Load relationships (dynamic relationships return query objects, need .all())
+        data['q_values'] = [qv.to_dict() for qv in self.q_values.all()]
+        data['explanation'] = self.explanation.to_dict() if self.explanation else None
+        data['safety_warnings'] = [sw.to_dict() for sw in self.safety_warnings.all()]
 
         return data
 
