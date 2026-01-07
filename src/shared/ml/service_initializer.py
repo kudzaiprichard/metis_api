@@ -81,7 +81,8 @@ class MLServiceManager:
         # Gemini LLM provider (shared)
         self._gemini_provider = create_gemini_provider(
             api_key=gemini_config['api_key'],
-            model_name=gemini_config['model']
+            model_name=gemini_config['model'],
+            timeout=100
         )
 
         # Get shared Neo4j from Neo4jManager (already initialized and verified)

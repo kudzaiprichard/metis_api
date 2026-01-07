@@ -2,6 +2,7 @@
 Prediction service for generating AI-powered treatment recommendations.
 """
 
+import json
 from decimal import Decimal
 
 from src.modules.recommendation.domain.models.prediction import Prediction
@@ -57,6 +58,120 @@ class PredictionService:
 
         # Initialize ML service
         self.ml_service = get_ml_service()
+
+    def _normalize_treatment_name(self, treatment_str: str) -> str:
+        """
+        Normalize treatment name to match Treatment enum.
+
+        Fallback for LLM variations despite prompt instructions.
+        """
+        # Simple normalization: remove hyphens and spaces, uppercase
+        normalized = treatment_str.upper().strip().replace('-', '').replace(' ', '')
+
+        # Map common variations
+        if 'GLP' in normalized:
+            return 'GLP1'
+        elif 'SGLT' in normalized:
+            return 'SGLT2'
+        elif 'DPP' in normalized:
+            return 'DPP4'
+        elif 'INSULIN' in normalized:
+            return 'INSULIN'
+        elif 'METFORMIN' in normalized:
+            return 'METFORMIN'
+
+        # If exact match already, return as-is
+        return normalized
+
+    def _map_severity_to_enum(self, severity_str: str) -> SafetySeverity:
+        """
+        Map severity string to SafetySeverity enum with fallback.
+
+        SafetySeverity values: INFO, CAUTION, WARNING, CRITICAL
+
+        Args:
+            severity_str: Severity string from ML module
+
+        Returns:
+            SafetySeverity enum value
+        """
+        severity_map = {
+            # Critical/High severity
+            'HIGH': SafetySeverity.CRITICAL,
+            'CRITICAL': SafetySeverity.CRITICAL,
+            'SEVERE': SafetySeverity.CRITICAL,
+
+            # Warning/Moderate severity
+            'MODERATE': SafetySeverity.WARNING,
+            'MEDIUM': SafetySeverity.WARNING,
+            'WARNING': SafetySeverity.WARNING,
+
+            # Caution/Low severity
+            'LOW': SafetySeverity.CAUTION,
+            'MILD': SafetySeverity.CAUTION,
+            'MINOR': SafetySeverity.CAUTION,
+            'CAUTION': SafetySeverity.CAUTION,
+
+            # Info
+            'INFO': SafetySeverity.INFO,
+            'INFORMATIONAL': SafetySeverity.INFO
+        }
+
+        severity_upper = severity_str.upper() if severity_str else 'WARNING'
+        return severity_map.get(severity_upper, SafetySeverity.WARNING)
+
+    def _map_confidence_to_enum(self, confidence_str: str) -> ConfidenceLevel:
+        """
+        Map confidence string to ConfidenceLevel enum with fallback.
+
+        ConfidenceLevel values: CRITICAL, LOW, MODERATE, HIGH, VERY_HIGH
+
+        Args:
+            confidence_str: Confidence string from ML module
+
+        Returns:
+            ConfidenceLevel enum value
+        """
+        confidence_map = {
+            'CRITICAL': ConfidenceLevel.CRITICAL,
+            'VERY_LOW': ConfidenceLevel.CRITICAL,
+            'LOW': ConfidenceLevel.LOW,
+            'MODERATE': ConfidenceLevel.MODERATE,
+            'MEDIUM': ConfidenceLevel.MODERATE,
+            'HIGH': ConfidenceLevel.HIGH,
+            'VERY_HIGH': ConfidenceLevel.VERY_HIGH,
+            'VERYHIGH': ConfidenceLevel.VERY_HIGH
+        }
+
+        confidence_upper = confidence_str.upper().replace(' ', '_').replace('-', '_') if confidence_str else 'MODERATE'
+        return confidence_map.get(confidence_upper, ConfidenceLevel.MODERATE)
+
+    def _map_priority_to_enum(self, priority_str: str) -> ClinicalPriority:
+        """
+        Map priority string to ClinicalPriority enum with fallback.
+
+        ClinicalPriority values: ROUTINE, STANDARD, URGENT, CRITICAL
+
+        Args:
+            priority_str: Priority string from ML module
+
+        Returns:
+            ClinicalPriority enum value
+        """
+        priority_map = {
+            'ROUTINE': ClinicalPriority.ROUTINE,
+            'LOW': ClinicalPriority.ROUTINE,
+            'STANDARD': ClinicalPriority.STANDARD,
+            'NORMAL': ClinicalPriority.STANDARD,
+            'MODERATE': ClinicalPriority.STANDARD,
+            'URGENT': ClinicalPriority.URGENT,
+            'HIGH': ClinicalPriority.URGENT,
+            'CRITICAL': ClinicalPriority.CRITICAL,
+            'EMERGENCY': ClinicalPriority.CRITICAL
+        }
+
+        priority_upper = priority_str.upper() if priority_str else 'STANDARD'
+        return priority_map.get(priority_upper, ClinicalPriority.STANDARD)
 
     def _build_patient_summary(self, patient_id: str) -> PatientSummaryResponse:
         """
@@ -199,7 +314,7 @@ class PredictionService:
             patient_id=request.patient_id,
             created_by=created_by_user_id,
             model_version=ai_result['model_version'],
-            recommended_treatment=Treatment[ai_result['recommended_treatment']],
+            recommended_treatment=Treatment[self._normalize_treatment_name(ai_result['recommended_treatment'])],
             treatment_index=ai_result['treatment_index'],
             predicted_reduction=Decimal(str(ai_result['predicted_reduction'])),
             confidence_score=Decimal(str(ai_result['confidence_score'])),
@@ -214,7 +329,7 @@ class PredictionService:
         for qv in ai_result['q_values']:
             q_value = PredictionQValue(
                 prediction_id=saved_prediction.id,
-                treatment=Treatment[qv['treatment']],
+                treatment=Treatment[self._normalize_treatment_name(qv['treatment'])],
                 q_value=Decimal(str(qv['q_value'])),
                 rank=qv['rank']
             )
@@ -222,7 +337,7 @@ class PredictionService:
         saved_q_values = self.q_value_repository.create_many(q_value_records)
 
         # ============================================
-        # 9. CREATE EXPLANATION
+        # 9. CREATE EXPLANATION (with safe enum mapping)
         # ============================================
         saved_explanation = None
         saved_features = []
@@ -231,12 +346,12 @@ class PredictionService:
         if ai_result.get('explanation'):
             exp_data = ai_result['explanation']
 
-            # Create explanation record
+            # Create explanation record with safe enum mapping
             explanation = PredictionExplanation(
                 prediction_id=saved_prediction.id,
                 summary_text=exp_data['summary_text'],
-                confidence_level=ConfidenceLevel[exp_data['confidence_level'].upper()],
-                clinical_priority=ClinicalPriority[exp_data['clinical_priority'].upper()],
+                confidence_level=self._map_confidence_to_enum(exp_data['confidence_level']),
+                clinical_priority=self._map_priority_to_enum(exp_data['clinical_priority']),
                 why_this_treatment=exp_data['why_this_treatment'],
                 why_not_alternatives=exp_data['why_not_alternatives'],
                 base_value=Decimal(str(exp_data['base_value'])),
@@ -268,7 +383,7 @@ class PredictionService:
                 alternative = ExplanationAlternative(
                     explanation_id=saved_explanation.id,
                     rank=alt['rank'],
-                    treatment=Treatment[alt['treatment']],
+                    treatment=Treatment[self._normalize_treatment_name(alt['treatment'])],
                     predicted_reduction=Decimal(str(alt['predicted_reduction'])),
                     pros=alt['pros'],
                     cons=alt['cons'],
@@ -286,10 +401,11 @@ class PredictionService:
         for warn in ai_result.get('safety_warnings', []):
             warning = SafetyWarning(
                 prediction_id=saved_prediction.id,
-                severity=SafetySeverity[warn['severity'].upper()],
+                severity=self._map_severity_to_enum(warn['severity']),
                 concern=warn['concern'],
                 patient_factor=warn['patient_factor'],
-                mitigation=warn['mitigation']
+                mitigation=warn['mitigation'],
+                reason=warn.get('reason')
             )
             warning_records.append(warning)
         if warning_records:
@@ -330,7 +446,7 @@ class PredictionService:
                 999  # Fallback rank
             )
             q_values.append({
-                'treatment': treatment.upper().replace('-', ''),
+                'treatment': self._normalize_treatment_name(treatment),
                 'q_value': q_value,
                 'rank': rank
             })
@@ -356,7 +472,7 @@ class PredictionService:
             for alt in explanation_result.alternatives.alternatives[:3]:
                 alternatives.append({
                     'rank': alt.rank,
-                    'treatment': alt.treatment.upper().replace('-', ''),
+                    'treatment': self._normalize_treatment_name(alt.treatment),
                     'predicted_reduction': alt.predicted_reduction,
                     'pros': ', '.join(alt.pros) if isinstance(alt.pros, list) else alt.pros,
                     'cons': ', '.join(alt.cons) if isinstance(alt.cons, list) else alt.cons,
@@ -381,39 +497,61 @@ class PredictionService:
                 'alternatives': alternatives
             }
 
-        # Build safety warnings
+        # Build safety warnings with only concern and reason
         safety_warnings = []
         if explanation_result and explanation_result.safety_checks.warnings:
             for warning in explanation_result.safety_checks.warnings:
                 safety_warnings.append({
                     'severity': warning.severity,
                     'concern': warning.concern,
-                    'patient_factor': 'N/A',  # Not in SafetyWarning object
-                    'mitigation': warning.mitigation
+                    'patient_factor': 'N/A',
+                    'mitigation': warning.mitigation,
+                    'reason': None
                 })
 
-        # Add contraindications as critical warnings
+        # Add contraindications as critical warnings (with reason only)
         if explanation_result and explanation_result.safety_checks.contraindications:
             for contra in explanation_result.safety_checks.contraindications:
                 if isinstance(contra, dict):
-                    severity = contra.get('severity', 'critical')
-                    concern = contra.get('condition', 'Unknown contraindication')
-                    mitigation = contra.get('alternative', 'Consult physician')
+                    # Already a dict - extract concern and reason, use alternative as mitigation
+                    safety_warnings.append({
+                        'severity': contra.get('severity', 'critical'),
+                        'concern': contra.get('condition', 'Unknown contraindication'),
+                        'patient_factor': 'Contraindication',
+                        'mitigation': contra.get('alternative', 'Consult physician'),
+                        'reason': contra.get('reason')
+                    })
+                elif isinstance(contra, str):
+                    # Try to parse if it's a string representation of dict
+                    try:
+                        contra_dict = json.loads(contra.replace("'", '"'))
+                        safety_warnings.append({
+                            'severity': contra_dict.get('severity', 'critical'),
+                            'concern': contra_dict.get('condition', 'Unknown contraindication'),
+                            'patient_factor': 'Contraindication',
+                            'mitigation': contra_dict.get('alternative', 'Consult physician'),
+                            'reason': contra_dict.get('reason')
+                        })
+                    except:
+                        safety_warnings.append({
+                            'severity': 'critical',
+                            'concern': str(contra),
+                            'patient_factor': 'Contraindication',
+                            'mitigation': 'Consult physician before use',
+                            'reason': None
+                        })
                 else:
-                    severity = 'critical'
-                    concern = str(contra)
-                    mitigation = 'Consult physician before use'
-
-                safety_warnings.append({
-                    'severity': severity,
-                    'concern': concern,
-                    'patient_factor': 'Contraindication',
-                    'mitigation': mitigation
-                })
+                    safety_warnings.append({
+                        'severity': 'critical',
+                        'concern': str(contra),
+                        'patient_factor': 'Contraindication',
+                        'mitigation': 'Consult physician before use',
+                        'reason': None
+                    })
 
         return {
             'model_version': model_version,
-            'recommended_treatment': prediction_result.recommended_treatment.upper().replace('-', ''),
+            'recommended_treatment': self._normalize_treatment_name(prediction_result.recommended_treatment),
             'treatment_index': prediction_result.treatment_index,
             'predicted_reduction': prediction_result.predicted_hba1c_reduction,
             'confidence_score': prediction_result.confidence_score,
