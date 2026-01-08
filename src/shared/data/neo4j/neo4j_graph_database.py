@@ -616,8 +616,16 @@ class Neo4jGraphDatabase(GraphDatabaseInterface):
                        t.drug_class AS drug_class,
                        o.hba1c_reduction AS hba1c_reduction,
                        o.hba1c_followup AS hba1c_followup,
-                       o.time_to_target AS time_to_target,
-                       o.adverse_events AS adverse_events,
+                       CASE 
+                         WHEN o.time_to_target IS NULL OR toString(o.time_to_target) = 'NaN' 
+                         THEN 'Unknown' 
+                         ELSE o.time_to_target 
+                       END AS time_to_target,
+                       CASE 
+                         WHEN o.adverse_events IS NULL OR toString(o.adverse_events) = 'NaN' 
+                         THEN 'None' 
+                         ELSE o.adverse_events 
+                       END AS adverse_events,
                        o.outcome_category AS outcome_category,
                        o.success AS success,
                        similarity_score,
@@ -784,8 +792,16 @@ class Neo4jGraphDatabase(GraphDatabaseInterface):
                        t.drug_class AS drug_class,
                        o.hba1c_reduction AS reduction,
                        o.hba1c_followup AS hba1c_followup,
-                       o.time_to_target AS time_to_target,
-                       o.adverse_events AS adverse_events,
+                       CASE 
+                         WHEN o.time_to_target IS NULL OR toString(o.time_to_target) = 'NaN' 
+                         THEN 'Unknown' 
+                         ELSE o.time_to_target 
+                       END AS time_to_target,
+                       CASE 
+                         WHEN o.adverse_events IS NULL OR toString(o.adverse_events) = 'NaN' 
+                         THEN 'None' 
+                         ELSE o.adverse_events 
+                       END AS adverse_events,
                        o.outcome_category AS outcome_category,
                        similarity_score
                 """
@@ -1074,8 +1090,16 @@ class Neo4jGraphDatabase(GraphDatabaseInterface):
                        t.evidence_level AS evidence_level,
                        o.hba1c_reduction AS hba1c_reduction,
                        o.hba1c_followup AS hba1c_followup,
-                       o.time_to_target AS time_to_target,
-                       o.adverse_events AS adverse_events,
+                       CASE 
+                         WHEN o.time_to_target IS NULL OR toString(o.time_to_target) = 'NaN' 
+                         THEN 'Unknown' 
+                         ELSE o.time_to_target 
+                       END AS time_to_target,
+                       CASE 
+                         WHEN o.adverse_events IS NULL OR toString(o.adverse_events) = 'NaN' 
+                         THEN 'None' 
+                         ELSE o.adverse_events 
+                       END AS adverse_events,
                        o.outcome_category AS outcome_category,
                        o.success AS success
                 """
@@ -1143,7 +1167,6 @@ class Neo4jGraphDatabase(GraphDatabaseInterface):
 
                 logger.info(f"Retrieved patient {patient_id} from Neo4j")
                 return patient_data
-
         except Exception as e:
             logger.error(f"Error retrieving patient {patient_id} from Neo4j: {e}")
             return None
