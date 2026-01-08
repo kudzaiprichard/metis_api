@@ -5,6 +5,9 @@ from dotenv import load_dotenv
 from src.config.factory import create_app
 from src.modules.authentication.presentation.controllers.auth_controller import auth_bp
 from src.modules.authentication.presentation.controllers.user_controller import user_bp
+from src.modules.ml_models.presentation.controllers.batch_prediction_controller import batch_prediction_bp
+from src.modules.ml_models.presentation.controllers.model_management_controller import model_management_bp
+from src.modules.ml_models.presentation.controllers.online_learning_controller import online_learning_bp
 from src.modules.patients.presentation.controller.patient_controller import patients_bp
 from src.modules.patients.presentation.controller.similar_patients_controller import similar_patients_bp
 from src.modules.recommendation.presentation.controllers.recommendation_controller import recommendation_bp
@@ -80,7 +83,8 @@ def create_application():
 
     blueprints = [auth_bp, user_bp, patients_bp,
                   recommendation_bp, treatment_decision_bp,
-                  follow_up_bp, timeline_bp, similar_patients_bp]
+                  follow_up_bp, timeline_bp, similar_patients_bp,
+                  model_management_bp, batch_prediction_bp, online_learning_bp]
 
     try:
         flask_app = create_app(
