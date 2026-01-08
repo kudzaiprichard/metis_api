@@ -63,7 +63,10 @@ class ModelRegistry:
 
         # Initialize metadata manager
         from ..registry import create_metadata_manager
-        self.metadata_manager = create_metadata_manager()
+        self.metadata_manager = create_metadata_manager(
+            metadata_file_path=None,
+            models_dir=self.models_dir
+        )
 
         # Initialize if metadata file doesn't exist
         if not os.path.exists(self.metadata_manager.metadata_file_path):

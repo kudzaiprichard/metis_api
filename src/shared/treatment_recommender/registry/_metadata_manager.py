@@ -118,8 +118,8 @@ Base Neural T-Learner model trained on complete initial dataset.
             models_dir: Root directory for model versions (e.g., 'models', 'artifacts')
         """
         if metadata_file_path is None:
-            # Default location
-            self.metadata_file_path = 'artifacts/model_metadata.json'
+            # Use models_dir to construct path
+            self.metadata_file_path = os.path.join(models_dir, 'model_metadata.json')
         else:
             self.metadata_file_path = metadata_file_path
 
