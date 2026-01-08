@@ -1,9 +1,11 @@
 """
 ML Service Initializer - Stateless design for reliable version selection.
 """
+from typing import List, Dict, Optional
+
 from src.shared.data.neo4j.neo4j_manager import get_neo4j_manager
 from src.shared.treatment_recommender.explainability import create_gemini_provider, create_explainer
-from src.shared.treatment_recommender.pipelines import create_prediction_pipeline
+from src.shared.treatment_recommender.pipelines import create_prediction_pipeline, create_online_learning_pipeline
 from src.shared.treatment_recommender.registry import create_model_manager
 
 
@@ -120,6 +122,134 @@ class MLServiceManager:
         )
 
         app.logger.info("ML Services initialized successfully (stateless mode)")
+
+    # ============================================
+    # ONLINE LEARNING
+    # ============================================
+
+    def perform_online_learning(self,
+                                outcomes: List[Dict],
+                                base_version: str,  # REQUIRED - no default
+                                validate: bool = True,
+                                disable_ewc: bool = False,
+                                epochs: int = 1):
+        """
+        Perform online learning on patient outcomes to create new model version.
+
+        Process:
+        1. Load specified base model version
+        2. Train on patient outcomes using partial_fit with EWC
+        3. Validate performance before/after (optional)
+        4. Register new model version
+        5. Return training results
+
+        Note: Does NOT auto-activate the new version. Use switch_active_version()
+        manually to promote the new model to production.
+
+        Args:
+            outcomes: List of outcome dicts with keys:
+                     'patient': patient_dict (21 base features)
+                     'treatment_given': treatment name (e.g., 'Insulin')
+                     'reward': observed HbA1c reduction
+            base_version: Base version to train from (e.g., 'v1_0') - REQUIRED
+            validate: If True, validate performance before/after training
+            disable_ewc: If True, disable EWC for unrestricted learning (default: False)
+                        Use for testing or experimentation
+            epochs: Number of training epochs (default: 1)
+                   Higher values = more learning but risk of overfitting
+
+        Returns:
+            TrainingResult with:
+            - success: bool
+            - version_number: str (new version if successful)
+            - outcomes_processed: int
+            - performance_before: dict (if validate=True)
+            - performance_after: dict (if validate=True)
+            - timestamp: str
+            - error: str (if failed)
+            - model_files: dict (paths to saved files)
+
+        Raises:
+            RuntimeError: If ML services not initialized
+            ValueError: If base_version doesn't exist
+
+        Example:
+            outcomes = [
+                {
+                    'patient': {'age': 58, 'gender': 'Female', ...},
+                    'treatment_given': 'Insulin',
+                    'reward': 3.5
+                },
+                {
+                    'patient': {'age': 45, 'gender': 'Male', ...},
+                    'treatment_given': 'Metformin',
+                    'reward': 2.1
+                }
+            ]
+
+            # Train with EWC (recommended)
+            result = ml_service.perform_online_learning(
+                outcomes=outcomes,
+                base_version='v1_0',
+                validate=True
+            )
+
+            if result.success:
+                print(f"New version: {result.version_number}")
+                # Manually activate when ready
+                ml_service.switch_active_version(result.version_number)
+
+            # Train without EWC (testing)
+            result = ml_service.perform_online_learning(
+                outcomes=outcomes,
+                base_version='v1_0',
+                disable_ewc=True,
+                epochs=20
+            )
+        """
+        if self.model_manager is None:
+            raise RuntimeError("ML services not initialized. Call initialize() first.")
+
+        # Validate base_version exists (REQUIRED)
+        available = [v['version_number'] for v in self.model_manager.list_versions()]
+        if base_version not in available:
+            raise ValueError(
+                f"Base version '{base_version}' not found. "
+                f"Available versions: {', '.join(available)}"
+            )
+
+        if self._app:
+            self._app.logger.info(
+                f"Starting online learning: {len(outcomes)} outcomes, "
+                f"base={base_version}, epochs={epochs}, ewc={'off' if disable_ewc else 'on'}"
+            )
+
+        # Create online learning pipeline
+        pipeline = create_online_learning_pipeline(
+            model_manager=self.model_manager,
+            verbose=False
+        )
+
+        # Perform training
+        result = pipeline.partial_fit(
+            outcomes=outcomes,
+            base_version=base_version,
+            validate=validate,
+            disable_ewc=disable_ewc,
+            epochs=epochs
+        )
+
+        if result.success:
+            if self._app:
+                self._app.logger.info(
+                    f"Online learning complete: New version {result.version_number} created. "
+                    f"Use switch_active_version() to activate."
+                )
+        else:
+            if self._app:
+                self._app.logger.error(f"Online learning failed: {result.error}")
+
+        return result
 
     # ============================================
     # PRIMARY PREDICTION METHODS
