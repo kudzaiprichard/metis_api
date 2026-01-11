@@ -6,7 +6,7 @@ Handles batch predictions for model validation.
 from flask import Blueprint, request, jsonify
 
 from src.config.auth_setup import jwt_auth
-from src.modules.ml_models.application.services.batch_prediction_service import BatchPredictionService
+from src.modules.ml_models.domain.services.batch_prediction_service import BatchPredictionService
 from src.modules.ml_models.presentation.dtos.batch_prediction_dtos import (
     BatchPredictionRequest
 )
@@ -15,8 +15,20 @@ from src.shared.response.api_response import ApiResponse
 # Create blueprint
 batch_prediction_bp = Blueprint('batch_prediction', __name__, url_prefix='/api/v1/ml/batch-predictions')
 
-# Initialize service
-batch_service = BatchPredictionService()
+
+# =============================================================================
+# LAZY INITIALIZATION HELPER
+# =============================================================================
+
+def get_batch_service():
+    """
+    Lazy initialization of BatchPredictionService.
+    Creates service instance on-demand after app initialization is complete.
+
+    Returns:
+        BatchPredictionService: Initialized service instance
+    """
+    return BatchPredictionService()
 
 
 # =============================================================================
@@ -28,6 +40,8 @@ batch_service = BatchPredictionService()
 @jwt_auth.role_required('ML_ENGINEER')
 def process_batch():
     """Process batch predictions for model validation."""
+    batch_service = get_batch_service()
+
     request_dto = BatchPredictionRequest(**request.json)
 
     result_dto = batch_service.process_batch(request_dto)
@@ -49,6 +63,8 @@ def process_batch():
 @jwt_auth.role_required('ML_ENGINEER')
 def get_summary():
     """Get summary statistics for batch predictions."""
+    batch_service = get_batch_service()
+
     request_dto = BatchPredictionRequest(**request.json)
 
     summary_dto = batch_service.get_summary(request_dto)

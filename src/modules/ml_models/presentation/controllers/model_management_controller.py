@@ -6,7 +6,7 @@ Handles ML model CRUD operations.
 from flask import Blueprint, request, jsonify
 
 from src.config.auth_setup import jwt_auth
-from src.modules.ml_models.application.services.model_manager_service import ModelManagerService
+from src.modules.ml_models.domain.services.model_manager_service import ModelManagerService
 from src.modules.ml_models.presentation.dtos.model_dtos import (
     ListModelsRequest,
     ActivateModelRequest,
@@ -18,8 +18,20 @@ from src.shared.response.api_response import ApiResponse
 # Create blueprint
 model_management_bp = Blueprint('model_management', __name__, url_prefix='/api/v1/ml/models')
 
-# Initialize service
-model_service = ModelManagerService()
+
+# =============================================================================
+# LAZY INITIALIZATION HELPER
+# =============================================================================
+
+def get_model_service():
+    """
+    Lazy initialization of ModelManagerService.
+    Creates service instance on-demand after app initialization is complete.
+
+    Returns:
+        ModelManagerService: Initialized service instance
+    """
+    return ModelManagerService()
 
 
 # =============================================================================
@@ -31,6 +43,8 @@ model_service = ModelManagerService()
 @jwt_auth.role_required('ML_ENGINEER')
 def list_models():
     """List all available model versions with sorting."""
+    model_service = get_model_service()
+
     request_dto = ListModelsRequest(
         sort_by=request.args.get('sort_by', 'version'),
         reverse=request.args.get('reverse', 'false').lower() == 'true'
@@ -55,6 +69,8 @@ def list_models():
 @jwt_auth.role_required('ML_ENGINEER')
 def get_model(version):
     """Get detailed information for a specific model version."""
+    model_service = get_model_service()
+
     model_dto = model_service.get_model_info(version)
 
     response = ApiResponse.success(
@@ -74,6 +90,8 @@ def get_model(version):
 @jwt_auth.role_required('ML_ENGINEER')
 def get_active_model():
     """Get currently active model version information."""
+    model_service = get_model_service()
+
     active_model_dto = model_service.get_active_model()
 
     response = ApiResponse.success(
@@ -93,6 +111,8 @@ def get_active_model():
 @jwt_auth.role_required('ML_ENGINEER')
 def activate_model(version):
     """Activate a specific model version."""
+    model_service = get_model_service()
+
     request_dto = ActivateModelRequest(version=version)
 
     model_dto = model_service.activate_model(request_dto)
@@ -114,6 +134,8 @@ def activate_model(version):
 @jwt_auth.role_required('ML_ENGINEER')
 def delete_model(version):
     """Delete a model version."""
+    model_service = get_model_service()
+
     request_dto = DeleteModelRequest(
         version=version,
         delete_files=request.args.get('delete_files', 'true').lower() == 'true'
@@ -138,6 +160,8 @@ def delete_model(version):
 @jwt_auth.role_required('ML_ENGINEER')
 def get_status():
     """Get model manager status."""
+    model_service = get_model_service()
+
     status_dto = model_service.get_status()
 
     response = ApiResponse.success(
@@ -157,6 +181,8 @@ def get_status():
 @jwt_auth.role_required('ML_ENGINEER')
 def compare_models():
     """Compare performance between two model versions."""
+    model_service = get_model_service()
+
     request_dto = CompareModelsRequest(**request.json)
 
     comparison_dto = model_service.compare_models(request_dto)
@@ -178,6 +204,8 @@ def compare_models():
 @jwt_auth.role_required('ML_ENGINEER')
 def get_lineage(version):
     """Get version lineage for a model."""
+    model_service = get_model_service()
+
     lineage_dto = model_service.get_lineage(version)
 
     response = ApiResponse.success(

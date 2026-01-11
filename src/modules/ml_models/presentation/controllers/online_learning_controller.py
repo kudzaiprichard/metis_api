@@ -6,7 +6,7 @@ Handles ML model training operations.
 from flask import Blueprint, request, jsonify
 
 from src.config.auth_setup import jwt_auth
-from src.modules.ml_models.application.services.online_learning_service import OnlineLearningService
+from src.modules.ml_models.domain.services.online_learning_service import OnlineLearningService
 from src.modules.ml_models.presentation.dtos.online_learning_dtos import (
     OnlineLearningRequest
 )
@@ -15,8 +15,20 @@ from src.shared.response.api_response import ApiResponse
 # Create blueprint
 online_learning_bp = Blueprint('online_learning', __name__, url_prefix='/api/v1/ml/training')
 
-# Initialize service
-training_service = OnlineLearningService()
+
+# =============================================================================
+# LAZY INITIALIZATION HELPER
+# =============================================================================
+
+def get_training_service():
+    """
+    Lazy initialization of OnlineLearningService.
+    Creates service instance on-demand after app initialization is complete.
+
+    Returns:
+        OnlineLearningService: Initialized service instance
+    """
+    return OnlineLearningService()
 
 
 # =============================================================================
@@ -28,6 +40,8 @@ training_service = OnlineLearningService()
 @jwt_auth.role_required('ML_ENGINEER')
 def train_model():
     """Train a new model version using patient outcomes."""
+    training_service = get_training_service()
+
     request_dto = OnlineLearningRequest(**request.json)
 
     result_dto = training_service.train_model(request_dto)
@@ -55,6 +69,8 @@ def train_model():
 @jwt_auth.role_required('ML_ENGINEER')
 def get_training_status():
     """Get current training status."""
+    training_service = get_training_service()
+
     status_dto = training_service.get_training_status()
 
     response = ApiResponse.success(
