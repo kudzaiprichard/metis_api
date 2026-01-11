@@ -10,7 +10,6 @@ from src.modules.recommendation.domain.services.prediction_management_service im
 from src.modules.recommendation.presentation.dtos.prediction_dtos import (
     GeneratePredictionRequest,
     GetPredictionRequest,
-    GetPatientPredictionsRequest,
     ListPredictionsRequest
 )
 from src.shared.response.api_response import ApiResponse
@@ -64,34 +63,6 @@ def get_prediction(prediction_id):
     response = ApiResponse.success(
         value=prediction_dto.model_dump(),
         message="Prediction retrieved successfully"
-    )
-
-    return jsonify(response.to_dict()), 200
-
-
-# =============================================================================
-# GET PATIENT PREDICTIONS ENDPOINT
-# =============================================================================
-
-@recommendation_bp.route('/patient/<string:patient_id>', methods=['GET'])
-@jwt_auth.jwt_access_required
-@jwt_auth.role_required('DOCTOR')
-def get_patient_predictions(patient_id):
-    """Get all recommendation for a patient."""
-    limit = request.args.get('limit', None, type=int)
-
-    request_dto = GetPatientPredictionsRequest(
-        patient_id=patient_id,
-        limit=limit
-    )
-
-    recommendation = prediction_management_service.get_patient_predictions(request_dto)
-
-    predictions_data = [pred.model_dump() for pred in recommendation]
-
-    response = ApiResponse.success(
-        value=predictions_data,
-        message="Patient recommendation retrieved successfully"
     )
 
     return jsonify(response.to_dict()), 200

@@ -6,7 +6,6 @@ from typing import List, Tuple
 
 from src.modules.recommendation.presentation.dtos.prediction_dtos import (
     GetPredictionRequest,
-    GetPatientPredictionsRequest,
     ListPredictionsRequest,
     PredictionResponse,
     PredictionDetailResponse,
@@ -86,52 +85,6 @@ class PredictionManagementService:
         response_dict['patient'] = patient_summary.model_dump()
 
         return PredictionDetailResponse(**response_dict)
-
-    def get_patient_predictions(self, request: GetPatientPredictionsRequest) -> List[PredictionResponse]:
-        """
-        Get all recommendation for a patient.
-
-        Args:
-            request: GetPatientPredictionsRequest DTO
-
-        Returns:
-            List of PredictionResponse DTOs
-
-        Raises:
-            NotFoundException: If patient not found
-        """
-        # Validate patient exists
-        patient = self.patient_repository.find_by_id(request.patient_id)
-        if not patient:
-            error = ErrorDetail(
-                title="Patient Not Found",
-                code="PATIENT_NOT_FOUND",
-                status=404,
-                details=[f"Patient with ID {request.patient_id} does not exist"]
-            )
-            raise NotFoundException(
-                message="The patient you're looking for doesn't exist",
-                error_detail=error
-            )
-
-        # Get recommendation
-        recommendation = self.prediction_repository.find_by_patient_id(request.patient_id)
-
-        # Apply limit if specified
-        if request.limit:
-            recommendation = recommendation[:request.limit]
-
-        # Build patient summary once
-        patient_summary = self._build_patient_summary(request.patient_id)
-
-        # Convert to response DTOs with patient info
-        prediction_responses = []
-        for pred in recommendation:
-            response_dict = pred.to_dict()
-            response_dict['patient'] = patient_summary.model_dump()
-            prediction_responses.append(PredictionResponse(**response_dict))
-
-        return prediction_responses
 
     def list_predictions(self, request: ListPredictionsRequest) -> Tuple[List[PredictionResponse], int]:
         """

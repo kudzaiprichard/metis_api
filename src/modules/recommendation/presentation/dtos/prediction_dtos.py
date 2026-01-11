@@ -152,14 +152,6 @@ class GetPredictionRequest(BaseModel):
     prediction_id: str = Field(..., min_length=1)
 
 
-# ============ Get Patient Predictions ============
-
-class GetPatientPredictionsRequest(BaseModel):
-    """DTO for getting all predictions for a patient."""
-    patient_id: str = Field(..., min_length=1)
-    limit: Optional[int] = Field(None, ge=1, le=100, description="Max number of predictions to return")
-
-
 # ============ List Predictions (Pagination) ============
 
 class ListPredictionsRequest(BaseModel):
