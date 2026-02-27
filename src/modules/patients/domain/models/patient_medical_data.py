@@ -6,12 +6,12 @@ from src.shared.data.database import db
 class PatientMedicalData(BaseModel):
     """
     Patient medical data model storing 21 base features for AI predictions.
-    1-to-1 relationship with Patient.
+    One-to-many relationship with Patient (one record per visit).
     """
     __tablename__ = 'patient_medical_data'
 
-    # Foreign key to patients table (UNIQUE for 1-to-1)
-    patient_id = db.Column(db.String(36), db.ForeignKey('patients.id'), unique=True, nullable=False, index=True)
+    # Foreign key to patients table (NOT unique — multiple records per patient)
+    patient_id = db.Column(db.String(36), db.ForeignKey('patients.id'), nullable=False, index=True)
 
     # Demographics
     age = db.Column(db.Integer, nullable=False)
@@ -50,17 +50,18 @@ class PatientMedicalData(BaseModel):
     nafld = db.Column(db.Boolean, nullable=False)
     retinopathy = db.Column(db.Boolean, nullable=False)
 
+    # Relationship to prediction
+    prediction = db.relationship('Prediction', backref='medical_data', uselist=False, cascade='all, delete-orphan')
+
     def to_dict(self, exclude: list = None) -> dict:
         """Override to handle enum serialization and datetime conversion."""
         data = super().to_dict(exclude=exclude)
 
-        # Handle enum serialization
         if 'gender' in data:
             data['gender'] = self.gender.value if hasattr(self.gender, 'value') else self.gender
         if 'ethnicity' in data:
             data['ethnicity'] = self.ethnicity.value if hasattr(self.ethnicity, 'value') else self.ethnicity
 
-        # Handle datetime serialization
         if 'updated_at' in data and self.updated_at:
             data['updated_at'] = self.updated_at.isoformat()
         if 'created_at' in data and self.created_at:

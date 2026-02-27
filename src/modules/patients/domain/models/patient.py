@@ -1,6 +1,7 @@
 from src.shared.data.base.model import BaseModel
 from src.shared.data.database import db
 
+
 class Patient(BaseModel):
     """
     Patient model for storing contact and demographic information.
@@ -12,14 +13,19 @@ class Patient(BaseModel):
     email = db.Column(db.String(255), nullable=True)
     mobile_number = db.Column(db.String(20), nullable=True)
 
-    # Relationships
-    medical_data = db.relationship('PatientMedicalData', backref='patient', uselist=False, cascade='all, delete-orphan')
+    # Relationships (one-to-many: one patient, multiple medical data records)
+    medical_records = db.relationship(
+        'PatientMedicalData',
+        backref='patient',
+        lazy='dynamic',
+        cascade='all, delete-orphan',
+        order_by='PatientMedicalData.created_at.desc()'
+    )
 
     def to_dict(self, exclude: list = None) -> dict:
         """Override to handle datetime conversion."""
         data = super().to_dict(exclude=exclude)
 
-        # Handle datetime serialization
         if 'created_at' in data and self.created_at:
             data['created_at'] = self.created_at.isoformat()
         if 'updated_at' in data and self.updated_at:
