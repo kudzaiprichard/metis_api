@@ -3,6 +3,8 @@ from datetime import datetime
 from pydantic import BaseModel, EmailStr, Field, field_validator
 from decimal import Decimal
 
+from src.modules.recommendation.presentation.dtos.prediction_dtos import PredictionDetailResponse
+
 
 # ============ Shared Patient Response ============
 
@@ -24,7 +26,7 @@ class PatientResponse(BaseModel):
 # ============ Patient Medical Data Response ============
 
 class PatientMedicalDataResponse(BaseModel):
-    """Patient medical data response DTO."""
+    """Patient medical data response DTO with its prediction."""
     id: str
     patient_id: str
     age: int
@@ -48,6 +50,7 @@ class PatientMedicalDataResponse(BaseModel):
     cvd: bool
     nafld: bool
     retinopathy: bool
+    prediction: Optional[PredictionDetailResponse] = None
     created_at: datetime
     updated_at: datetime
 

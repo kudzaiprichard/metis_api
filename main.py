@@ -11,10 +11,6 @@ from src.modules.ml_models.presentation.controllers.online_learning_controller i
 from src.modules.patients.presentation.controller.patient_controller import patients_bp
 from src.modules.patients.presentation.controller.similar_patients_controller import similar_patients_bp
 from src.modules.recommendation.presentation.controllers.recommendation_controller import recommendation_bp
-from src.modules.treatment_decisions.presentation.controllers.follow_up_controller import follow_up_bp
-from src.modules.treatment_decisions.presentation.controllers.timeline_controller import timeline_bp
-from src.modules.treatment_decisions.presentation.controllers.treatment_decision_controller import treatment_decision_bp
-
 
 def load_environment():
     """Load the appropriate .env file based on FLASK_ENV."""
@@ -82,8 +78,7 @@ def create_application():
     print("\n=== Starting Flask Application ===")
 
     blueprints = [auth_bp, user_bp, patients_bp,
-                  recommendation_bp, treatment_decision_bp,
-                  follow_up_bp, timeline_bp, similar_patients_bp,
+                  recommendation_bp, similar_patients_bp,
                   model_management_bp, batch_prediction_bp, online_learning_bp]
 
     try:

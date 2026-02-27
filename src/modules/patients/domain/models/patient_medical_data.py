@@ -54,7 +54,7 @@ class PatientMedicalData(BaseModel):
     prediction = db.relationship('Prediction', backref='medical_data', uselist=False, cascade='all, delete-orphan')
 
     def to_dict(self, exclude: list = None) -> dict:
-        """Override to handle enum serialization and datetime conversion."""
+        """Override to handle enum serialization, datetime conversion, and prediction."""
         data = super().to_dict(exclude=exclude)
 
         if 'gender' in data:
@@ -66,6 +66,9 @@ class PatientMedicalData(BaseModel):
             data['updated_at'] = self.updated_at.isoformat()
         if 'created_at' in data and self.created_at:
             data['created_at'] = self.created_at.isoformat()
+
+        # Include prediction if loaded
+        data['prediction'] = self.prediction.to_dict() if self.prediction else None
 
         return data
 
