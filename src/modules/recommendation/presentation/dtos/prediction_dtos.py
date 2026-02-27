@@ -1,4 +1,3 @@
-# src/modules/predictions/application/dtos/prediction_dtos.py
 from typing import Optional, List
 from datetime import datetime
 from pydantic import BaseModel, Field
@@ -102,7 +101,7 @@ class PredictionExplanationResponse(BaseModel):
 class PredictionResponse(BaseModel):
     """Standard prediction response DTO."""
     id: str
-    patient_id: str
+    medical_data_id: str
     patient: PatientSummaryResponse
     model_version: str
     recommended_treatment: str
@@ -120,7 +119,7 @@ class PredictionResponse(BaseModel):
 class PredictionDetailResponse(BaseModel):
     """Detailed prediction with Q-values, explanation, and safety warnings."""
     id: str
-    patient_id: str
+    medical_data_id: str
     patient: PatientSummaryResponse
     model_version: str
     recommended_treatment: str
@@ -141,8 +140,8 @@ class PredictionDetailResponse(BaseModel):
 # ============ Generate Prediction ============
 
 class GeneratePredictionRequest(BaseModel):
-    """DTO for generating a new prediction."""
-    patient_id: str = Field(..., min_length=1)
+    """DTO for generating a new prediction from a medical data snapshot."""
+    medical_data_id: str = Field(..., min_length=1)
 
 
 # ============ Get Single Prediction ============

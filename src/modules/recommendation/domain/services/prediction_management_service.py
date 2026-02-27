@@ -1,5 +1,5 @@
 """
-Prediction management service for retrieving and managing recommendation.
+Prediction management service for retrieving and managing recommendations.
 """
 
 from typing import List, Tuple
@@ -21,7 +21,7 @@ from src.shared.response.error_detail import ErrorDetail
 
 class PredictionManagementService:
     """
-    Service for managing and retrieving recommendation.
+    Service for managing and retrieving recommendations.
     """
 
     def __init__(self):
@@ -29,18 +29,19 @@ class PredictionManagementService:
         self.patient_repository = PatientRepository()
         self.medical_data_repository = PatientMedicalDataRepository()
 
-    def _build_patient_summary(self, patient_id: str) -> PatientSummaryResponse:
+    def _build_patient_summary(self, medical_data_id: str) -> PatientSummaryResponse:
         """
-        Build patient summary for prediction responses.
+        Build patient summary from medical data ID.
+        Resolves patient through the medical data record.
 
         Args:
-            patient_id: Patient ID
+            medical_data_id: Medical data ID
 
         Returns:
             PatientSummaryResponse DTO
         """
-        patient = self.patient_repository.find_by_id(patient_id)
-        medical_data = self.medical_data_repository.find_by_patient_id(patient_id)
+        medical_data = self.medical_data_repository.find_by_id(medical_data_id)
+        patient = self.patient_repository.find_by_id(medical_data.patient_id)
 
         return PatientSummaryResponse(
             id=patient.id,
@@ -77,8 +78,8 @@ class PredictionManagementService:
                 error_detail=error
             )
 
-        # Build patient summary
-        patient_summary = self._build_patient_summary(prediction.patient_id)
+        # Build patient summary via medical_data_id
+        patient_summary = self._build_patient_summary(prediction.medical_data_id)
 
         # Build response with patient info
         response_dict = prediction.to_dict()
@@ -88,7 +89,7 @@ class PredictionManagementService:
 
     def list_predictions(self, request: ListPredictionsRequest) -> Tuple[List[PredictionResponse], int]:
         """
-        List recommendation with pagination and optional filters.
+        List recommendations with pagination and optional patient filter.
 
         Args:
             request: ListPredictionsRequest DTO
@@ -96,31 +97,29 @@ class PredictionManagementService:
         Returns:
             Tuple of (list of PredictionResponse DTOs, total count)
         """
-        # Build filter dictionary
-        filters = {}
         if request.patient_id:
-            filters['patient_id'] = request.patient_id
+            # Get predictions via join through medical data
+            predictions = self.prediction_repository.find_by_patient_id(request.patient_id)
+            total = len(predictions)
 
-        # Get total count
-        total = self.prediction_repository.count(filters)
-
-        # Get paginated recommendation
-        pagination = self.prediction_repository.paginate(
-            page=request.page,
-            per_page=request.per_page,
-            include_deleted=False
-        )
-
-        recommendation = pagination.items
-
-        # Apply patient_id filter if specified
-        if request.patient_id:
-            recommendation = [p for p in recommendation if p.patient_id == request.patient_id]
+            # Manual pagination
+            start = request.get_offset()
+            end = start + request.per_page
+            predictions = predictions[start:end]
+        else:
+            # Get all predictions with standard pagination
+            total = self.prediction_repository.count()
+            pagination = self.prediction_repository.paginate(
+                page=request.page,
+                per_page=request.per_page,
+                include_deleted=False
+            )
+            predictions = pagination.items
 
         # Convert to response DTOs with patient info
         prediction_responses = []
-        for pred in recommendation:
-            patient_summary = self._build_patient_summary(pred.patient_id)
+        for pred in predictions:
+            patient_summary = self._build_patient_summary(pred.medical_data_id)
             response_dict = pred.to_dict()
             response_dict['patient'] = patient_summary.model_dump()
             prediction_responses.append(PredictionResponse(**response_dict))
@@ -151,5 +150,4 @@ class PredictionManagementService:
                 error_detail=error
             )
 
-        # Soft delete (cascades to related records via relationships)
         self.prediction_repository.delete(prediction)

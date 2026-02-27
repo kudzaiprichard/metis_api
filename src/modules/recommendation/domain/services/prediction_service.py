@@ -2,7 +2,6 @@
 Prediction service for generating AI-powered treatment recommendations.
 """
 
-import json
 from decimal import Decimal
 
 from src.modules.recommendation.domain.models.prediction import Prediction
@@ -26,14 +25,13 @@ from src.modules.recommendation.domain.repositories.prediction_repository import
 from src.modules.recommendation.domain.repositories.prediction_q_value_repository import PredictionQValueRepository
 from src.modules.recommendation.domain.repositories.prediction_explanation_repository import PredictionExplanationRepository
 from src.modules.recommendation.domain.repositories.explanation_feature_repository import ExplanationFeatureRepository
-from src.modules.recommendation.domain.repositories.explanation_alternative_repository import \
-    ExplanationAlternativeRepository
+from src.modules.recommendation.domain.repositories.explanation_alternative_repository import ExplanationAlternativeRepository
 from src.modules.recommendation.domain.repositories.safety_warning_repository import SafetyWarningRepository
 
 from src.modules.patients.domain.repositories.patient_repository import PatientRepository
 from src.modules.patients.domain.repositories.patient_medical_data_repository import PatientMedicalDataRepository
 
-from src.shared.exceptions.exceptions import NotFoundException, ValidationException
+from src.shared.exceptions.exceptions import NotFoundException, ValidationException, ConflictException
 from src.shared.response.error_detail import ErrorDetail
 from src.shared.ml.service_initializer import get_ml_service
 
@@ -41,9 +39,8 @@ from src.shared.ml.service_initializer import get_ml_service
 class PredictionService:
     """
     Service for generating AI-powered treatment recommendations.
-
-    Uses ACTIVE MODEL ONLY for production predictions to doctors.
-    Model version testing/switching is handled separately by testers.
+    Each prediction is tied to a specific medical data snapshot.
+    Uses ACTIVE MODEL ONLY for production predictions.
     """
 
     def __init__(self):
@@ -56,19 +53,16 @@ class PredictionService:
         self.patient_repository = PatientRepository()
         self.medical_data_repository = PatientMedicalDataRepository()
 
-        # Initialize ML service
         self.ml_service = get_ml_service()
 
-    def _normalize_treatment_name(self, treatment_str: str) -> str:
-        """
-        Normalize treatment name to match Treatment enum.
+    # ==========================================================================
+    # ENUM MAPPING HELPERS
+    # ==========================================================================
 
-        Fallback for LLM variations despite prompt instructions.
-        """
-        # Simple normalization: remove hyphens and spaces, uppercase
+    def _normalize_treatment_name(self, treatment_str: str) -> str:
+        """Normalize treatment name to match Treatment enum."""
         normalized = treatment_str.upper().strip().replace('-', '').replace(' ', '')
 
-        # Map common variations
         if 'GLP' in normalized:
             return 'GLP1'
         elif 'SGLT' in normalized:
@@ -80,58 +74,29 @@ class PredictionService:
         elif 'METFORMIN' in normalized:
             return 'METFORMIN'
 
-        # If exact match already, return as-is
         return normalized
 
     def _map_severity_to_enum(self, severity_str: str) -> SafetySeverity:
-        """
-        Map severity string to SafetySeverity enum with fallback.
-
-        SafetySeverity values: INFO, CAUTION, WARNING, CRITICAL
-
-        Args:
-            severity_str: Severity string from ML module
-
-        Returns:
-            SafetySeverity enum value
-        """
+        """Map severity string to SafetySeverity enum with fallback."""
         severity_map = {
-            # Critical/High severity
             'HIGH': SafetySeverity.CRITICAL,
             'CRITICAL': SafetySeverity.CRITICAL,
             'SEVERE': SafetySeverity.CRITICAL,
-
-            # Warning/Moderate severity
             'MODERATE': SafetySeverity.WARNING,
             'MEDIUM': SafetySeverity.WARNING,
             'WARNING': SafetySeverity.WARNING,
-
-            # Caution/Low severity
             'LOW': SafetySeverity.CAUTION,
             'MILD': SafetySeverity.CAUTION,
             'MINOR': SafetySeverity.CAUTION,
             'CAUTION': SafetySeverity.CAUTION,
-
-            # Info
             'INFO': SafetySeverity.INFO,
             'INFORMATIONAL': SafetySeverity.INFO
         }
-
         severity_upper = severity_str.upper() if severity_str else 'WARNING'
         return severity_map.get(severity_upper, SafetySeverity.WARNING)
 
     def _map_confidence_to_enum(self, confidence_str: str) -> ConfidenceLevel:
-        """
-        Map confidence string to ConfidenceLevel enum with fallback.
-
-        ConfidenceLevel values: CRITICAL, LOW, MODERATE, HIGH, VERY_HIGH
-
-        Args:
-            confidence_str: Confidence string from ML module
-
-        Returns:
-            ConfidenceLevel enum value
-        """
+        """Map confidence string to ConfidenceLevel enum with fallback."""
         confidence_map = {
             'CRITICAL': ConfidenceLevel.CRITICAL,
             'VERY_LOW': ConfidenceLevel.CRITICAL,
@@ -142,22 +107,11 @@ class PredictionService:
             'VERY_HIGH': ConfidenceLevel.VERY_HIGH,
             'VERYHIGH': ConfidenceLevel.VERY_HIGH
         }
-
         confidence_upper = confidence_str.upper().replace(' ', '_').replace('-', '_') if confidence_str else 'MODERATE'
         return confidence_map.get(confidence_upper, ConfidenceLevel.MODERATE)
 
     def _map_priority_to_enum(self, priority_str: str) -> ClinicalPriority:
-        """
-        Map priority string to ClinicalPriority enum with fallback.
-
-        ClinicalPriority values: ROUTINE, STANDARD, URGENT, CRITICAL
-
-        Args:
-            priority_str: Priority string from ML module
-
-        Returns:
-            ClinicalPriority enum value
-        """
+        """Map priority string to ClinicalPriority enum with fallback."""
         priority_map = {
             'ROUTINE': ClinicalPriority.ROUTINE,
             'LOW': ClinicalPriority.ROUTINE,
@@ -169,23 +123,15 @@ class PredictionService:
             'CRITICAL': ClinicalPriority.CRITICAL,
             'EMERGENCY': ClinicalPriority.CRITICAL
         }
-
         priority_upper = priority_str.upper() if priority_str else 'STANDARD'
         return priority_map.get(priority_upper, ClinicalPriority.STANDARD)
 
-    def _build_patient_summary(self, patient_id: str) -> PatientSummaryResponse:
-        """
-        Build patient summary for prediction responses.
+    # ==========================================================================
+    # PATIENT SUMMARY HELPER
+    # ==========================================================================
 
-        Args:
-            patient_id: Patient ID
-
-        Returns:
-            PatientSummaryResponse DTO
-        """
-        patient = self.patient_repository.find_by_id(patient_id)
-        medical_data = self.medical_data_repository.find_by_patient_id(patient_id)
-
+    def _build_patient_summary(self, patient, medical_data) -> PatientSummaryResponse:
+        """Build patient summary from patient and medical data entities."""
         return PatientSummaryResponse(
             id=patient.id,
             first_name=patient.first_name,
@@ -194,56 +140,76 @@ class PredictionService:
             gender=medical_data.gender.value
         )
 
+    # ==========================================================================
+    # GENERATE PREDICTION
+    # ==========================================================================
+
     def generate_prediction(self, request: GeneratePredictionRequest,
                             created_by_user_id: str) -> PredictionDetailResponse:
         """
-        Generate AI prediction for a patient using ACTIVE MODEL.
+        Generate AI prediction for a specific medical data snapshot.
 
         Args:
-            request: GeneratePredictionRequest DTO
+            request: GeneratePredictionRequest DTO with medical_data_id
             created_by_user_id: ID of the user generating the prediction
 
         Returns:
             PredictionDetailResponse DTO with full prediction details
 
         Raises:
-            NotFoundException: If patient not found or medical data missing
-            ValidationException: If prediction fails
+            NotFoundException: If medical data or patient not found
+            ConflictException: If prediction already exists for this medical data
+            ValidationException: If ML prediction fails
         """
         # ============================================
-        # 1. VALIDATE PATIENT EXISTS
+        # 1. VALIDATE MEDICAL DATA EXISTS
         # ============================================
-        patient = self.patient_repository.find_by_id(request.patient_id)
-        if not patient:
-            error = ErrorDetail(
-                title="Patient Not Found",
-                code="PATIENT_NOT_FOUND",
-                status=404,
-                details=[f"Patient with ID {request.patient_id} does not exist"]
-            )
-            raise NotFoundException(
-                message="The patient you're trying to generate prediction for doesn't exist",
-                error_detail=error
-            )
-
-        # ============================================
-        # 2. VALIDATE MEDICAL DATA EXISTS
-        # ============================================
-        medical_data = self.medical_data_repository.find_by_patient_id(request.patient_id)
+        medical_data = self.medical_data_repository.find_by_id(request.medical_data_id)
         if not medical_data:
             error = ErrorDetail(
                 title="Medical Data Not Found",
                 code="MEDICAL_DATA_NOT_FOUND",
                 status=404,
-                details=[f"Medical data for patient ID {request.patient_id} does not exist"]
+                details=[f"Medical data with ID {request.medical_data_id} does not exist"]
             )
             raise NotFoundException(
-                message="Patient must have medical data before generating prediction",
+                message="The medical data record you're trying to predict for doesn't exist",
                 error_detail=error
             )
 
         # ============================================
-        # 3. EXTRACT PATIENT FEATURES (21 base features)
+        # 2. CHECK PREDICTION DOESN'T ALREADY EXIST
+        # ============================================
+        if self.prediction_repository.exists_for_medical_data(request.medical_data_id):
+            error = ErrorDetail(
+                title="Prediction Already Exists",
+                code="PREDICTION_EXISTS",
+                status=409,
+                details=["A prediction has already been generated for this medical data record"]
+            )
+            raise ConflictException(
+                message="Prediction already exists for this medical data",
+                error_detail=error
+            )
+
+        # ============================================
+        # 3. VALIDATE PATIENT EXISTS
+        # ============================================
+        patient = self.patient_repository.find_by_id(medical_data.patient_id)
+        if not patient:
+            error = ErrorDetail(
+                title="Patient Not Found",
+                code="PATIENT_NOT_FOUND",
+                status=404,
+                details=[f"Patient with ID {medical_data.patient_id} does not exist"]
+            )
+            raise NotFoundException(
+                message="The patient linked to this medical data doesn't exist",
+                error_detail=error
+            )
+
+        # ============================================
+        # 4. EXTRACT PATIENT FEATURES (21 base features)
         # ============================================
         patient_features = {
             'age': medical_data.age,
@@ -270,16 +236,14 @@ class PredictionService:
         }
 
         # ============================================
-        # 4. GENERATE PREDICTION USING ACTIVE MODEL
+        # 5. GENERATE PREDICTION USING ACTIVE MODEL
         # ============================================
         try:
-            # Always use active model for production predictions
             ml_result = self.ml_service.predict_with_active_model(
                 patient_features=patient_features,
                 include_explanation=True
             )
         except Exception as e:
-            # Handle ML prediction errors
             error = ErrorDetail(
                 title="Prediction Error",
                 code="PREDICTION_FAILED",
@@ -292,14 +256,14 @@ class PredictionService:
             )
 
         # ============================================
-        # 5. EXTRACT ML RESULTS
+        # 6. EXTRACT ML RESULTS
         # ============================================
         prediction_result = ml_result['prediction']
         explanation_result = ml_result['explanation']
         model_version_used = ml_result['model_version_used']
 
         # ============================================
-        # 6. CONVERT ML RESULTS TO DB STRUCTURE
+        # 7. CONVERT ML RESULTS TO DB STRUCTURE
         # ============================================
         ai_result = self._convert_ml_result_to_dict(
             prediction_result,
@@ -308,10 +272,10 @@ class PredictionService:
         )
 
         # ============================================
-        # 7. CREATE PREDICTION RECORD
+        # 8. CREATE PREDICTION RECORD
         # ============================================
         prediction = Prediction(
-            patient_id=request.patient_id,
+            medical_data_id=request.medical_data_id,
             created_by=created_by_user_id,
             model_version=ai_result['model_version'],
             recommended_treatment=Treatment[self._normalize_treatment_name(ai_result['recommended_treatment'])],
@@ -323,7 +287,7 @@ class PredictionService:
         saved_prediction = self.prediction_repository.create(prediction)
 
         # ============================================
-        # 8. CREATE Q-VALUES (all 5 treatments)
+        # 9. CREATE Q-VALUES (all 5 treatments)
         # ============================================
         q_value_records = []
         for qv in ai_result['q_values']:
@@ -334,19 +298,14 @@ class PredictionService:
                 rank=qv['rank']
             )
             q_value_records.append(q_value)
-        saved_q_values = self.q_value_repository.create_many(q_value_records)
+        self.q_value_repository.create_many(q_value_records)
 
         # ============================================
-        # 9. CREATE EXPLANATION (with safe enum mapping)
+        # 10. CREATE EXPLANATION
         # ============================================
-        saved_explanation = None
-        saved_features = []
-        saved_alternatives = []
-
         if ai_result.get('explanation'):
             exp_data = ai_result['explanation']
 
-            # Create explanation record with safe enum mapping
             explanation = PredictionExplanation(
                 prediction_id=saved_prediction.id,
                 summary_text=exp_data['summary_text'],
@@ -375,7 +334,7 @@ class PredictionService:
                 )
                 feature_records.append(feature)
             if feature_records:
-                saved_features = self.feature_repository.create_many(feature_records)
+                self.feature_repository.create_many(feature_records)
 
             # Create alternatives
             alternative_records = []
@@ -391,16 +350,12 @@ class PredictionService:
                 )
                 alternative_records.append(alternative)
             if alternative_records:
-                saved_alternatives = self.alternative_repository.create_many(alternative_records)
+                self.alternative_repository.create_many(alternative_records)
 
         # ============================================
-        # 10. CREATE SAFETY WARNINGS (SIMPLIFIED!)
+        # 11. CREATE SAFETY WARNINGS
         # ============================================
-
-        # with reasons already populated
-        saved_warnings = []
         warning_records = []
-
         for warn in ai_result.get('safety_warnings', []):
             warning = SafetyWarning(
                 prediction_id=saved_prediction.id,
@@ -408,46 +363,35 @@ class PredictionService:
                 concern=warn['concern'],
                 patient_factor=warn['patient_factor'],
                 mitigation=warn['mitigation'],
-                reason=warn.get('reason')  # Already populated by synthesizer!
+                reason=warn.get('reason')
             )
             warning_records.append(warning)
-
         if warning_records:
-            saved_warnings = self.safety_warning_repository.create_many(warning_records)
-
-        # ============================================
-        # 11. BUILD PATIENT SUMMARY
-        # ============================================
-        patient_summary = self._build_patient_summary(request.patient_id)
+            self.safety_warning_repository.create_many(warning_records)
 
         # ============================================
         # 12. BUILD AND RETURN RESPONSE
         # ============================================
+        patient_summary = self._build_patient_summary(patient, medical_data)
+
         response_dict = saved_prediction.to_dict()
         response_dict['patient'] = patient_summary.model_dump()
 
         return PredictionDetailResponse(**response_dict)
 
+    # ==========================================================================
+    # ML RESULT CONVERSION
+    # ==========================================================================
+
     def _convert_ml_result_to_dict(self, prediction_result, explanation_result, model_version):
-        """
-        Convert ML module results to database-compatible dictionary structure.
-
-        Args:
-            prediction_result: TreatmentResult from ML module
-            explanation_result: ExplanationResult from ML module
-            model_version: Model version string used for prediction
-
-        Returns:
-            dict: Structured data ready for database storage
-        """
+        """Convert ML module results to database-compatible dictionary structure."""
         # Extract Q-values and create ranked list
         q_values = []
         for treatment, q_value in prediction_result.all_q_values.items():
-            # Find rank from ranked_treatments
             rank = next(
                 (item['rank'] for item in prediction_result.ranked_treatments
                  if item['treatment'] == treatment),
-                999  # Fallback rank
+                999
             )
             q_values.append({
                 'treatment': self._normalize_treatment_name(treatment),
@@ -458,7 +402,6 @@ class PredictionService:
         # Build explanation structure
         explanation_dict = None
         if explanation_result:
-            # Extract top features with CORRECT scaled_value
             top_features = []
             for feat in explanation_result.feature_importance.top_features[:5]:
                 top_features.append({
@@ -471,7 +414,6 @@ class PredictionService:
                     'reference_range': feat.reference_range
                 })
 
-            # Extract alternatives
             alternatives = []
             for alt in explanation_result.alternatives.alternatives[:3]:
                 alternatives.append({
@@ -483,7 +425,6 @@ class PredictionService:
                     'when_to_consider': alt.when_to_consider
                 })
 
-            # Get feature interactions text
             feature_interactions = None
             if explanation_result.model_reasoning.key_factors:
                 feature_interactions = explanation_result.model_reasoning.key_factors[0].evidence
@@ -501,7 +442,7 @@ class PredictionService:
                 'alternatives': alternatives
             }
 
-        # Build safety warnings (already processed by synthesizer with reasons!)
+        # Build safety warnings
         safety_warnings = []
         if explanation_result and explanation_result.safety_checks.warnings:
             for warning in explanation_result.safety_checks.warnings:
