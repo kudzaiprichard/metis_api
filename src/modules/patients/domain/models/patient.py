@@ -1,55 +1,37 @@
-from src.modules.recommendation.domain.models.enums import Treatment
 from src.shared.data.base.model import BaseModel
 from src.shared.data.database import db
 
 
-class Prediction(BaseModel):
+class Patient(BaseModel):
     """
-    Prediction model for AI-generated treatment recommendations.
-    Linked to a specific medical data snapshot (one prediction per medical record).
+    Patient model for storing contact and demographic information.
     """
-    __tablename__ = 'predictions'
+    __tablename__ = 'patients'
 
-    # Foreign keys
-    medical_data_id = db.Column(db.String(36), db.ForeignKey('patient_medical_data.id'), unique=True, nullable=False, index=True)
-    created_by = db.Column(db.String(36), db.ForeignKey('users.id'), nullable=False, index=True)
+    first_name = db.Column(db.String(100), nullable=False)
+    last_name = db.Column(db.String(100), nullable=False)
+    email = db.Column(db.String(255), nullable=True)
+    mobile_number = db.Column(db.String(20), nullable=True)
 
-    # Model information
-    model_version = db.Column(db.String(20), nullable=False, index=True)
-
-    # Recommendation
-    recommended_treatment = db.Column(db.Enum(Treatment), nullable=False)
-    treatment_index = db.Column(db.Integer, nullable=False)  # 0-4
-    predicted_reduction = db.Column(db.Numeric(4, 2), nullable=False)
-
-    # Confidence
-    confidence_score = db.Column(db.Numeric(5, 2), nullable=False)  # 0-100
-    confidence_margin = db.Column(db.Numeric(4, 2), nullable=False)  # Gap between top 2 Q-values
-
-    # Relationships
-    q_values = db.relationship('PredictionQValue', backref='prediction', lazy='dynamic', cascade='all, delete-orphan')
-    explanation = db.relationship('PredictionExplanation', backref='prediction', uselist=False, cascade='all, delete-orphan')
-    safety_warnings = db.relationship('SafetyWarning', backref='prediction', lazy='dynamic', cascade='all, delete-orphan')
+    # Relationships (one-to-many: one patient, multiple medical data records)
+    medical_records = db.relationship(
+        'PatientMedicalData',
+        backref='patient',
+        lazy='dynamic',
+        cascade='all, delete-orphan',
+        order_by='PatientMedicalData.created_at.desc()'
+    )
 
     def to_dict(self, exclude: list = None) -> dict:
-        """Override to handle enum serialization, datetime conversion, and relationships."""
+        """Override to handle datetime conversion."""
         data = super().to_dict(exclude=exclude)
-
-        if 'recommended_treatment' in data:
-            data['recommended_treatment'] = self.recommended_treatment.value if hasattr(
-                self.recommended_treatment, 'value') else self.recommended_treatment
 
         if 'created_at' in data and self.created_at:
             data['created_at'] = self.created_at.isoformat()
         if 'updated_at' in data and self.updated_at:
             data['updated_at'] = self.updated_at.isoformat()
 
-        # Load relationships
-        data['q_values'] = [qv.to_dict() for qv in self.q_values.all()]
-        data['explanation'] = self.explanation.to_dict() if self.explanation else None
-        data['safety_warnings'] = [sw.to_dict() for sw in self.safety_warnings.all()]
-
         return data
 
     def __repr__(self) -> str:
-        return f"<Prediction(id={self.id}, medical_data_id={self.medical_data_id}, treatment={self.recommended_treatment.value})>"
+        return f"<Patient(id={self.id}, name={self.first_name} {self.last_name})>"

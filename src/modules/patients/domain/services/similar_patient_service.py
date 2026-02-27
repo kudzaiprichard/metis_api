@@ -44,14 +44,7 @@ logger = logging.getLogger(__name__)
 class SimilarPatientService:
     """
     Service for finding similar patient cases.
-
-    Provides three main operations:
-    1. Find similar patients (tabular format) - for list/table display
-    2. Find similar patients (graph format) - for graph visualization
-    3. Get patient detail by case ID - for detailed case inspection
-
-    All operations use Neo4j historical dataset with normalized clinical
-    feature matching and comorbidity overlap scoring.
+    Uses the latest medical data record for similarity matching.
     """
 
     def __init__(self):
@@ -59,39 +52,35 @@ class SimilarPatientService:
         self.medical_data_repository = PatientMedicalDataRepository()
         self.neo4j_manager = get_neo4j_manager()
 
-    def find_similar_patients(self, request: FindSimilarPatientsRequest) -> SimilarPatientsResponse:
+    def _validate_patient_and_get_medical_data(self, patient_id: str):
         """
-        Find similar patient cases in tabular format.
-
-        Used for displaying similar cases in lists or tables.
+        Validate patient exists and has medical data.
+        Returns the latest medical data record.
 
         Args:
-            request: FindSimilarPatientsRequest DTO
+            patient_id: Patient ID
 
         Returns:
-            SimilarPatientsResponse DTO with list of similar cases
+            Latest PatientMedicalData instance
 
         Raises:
             NotFoundException: If patient not found
-            BadRequestException: If patient has no medical data
-            ServiceUnavailableException: If Neo4j unavailable
+            BadRequestException: If no medical data exists
         """
-        # Validate patient exists
-        patient = self.patient_repository.find_by_id(request.patient_id)
+        patient = self.patient_repository.find_by_id(patient_id)
         if not patient:
             error = ErrorDetail(
                 title="Patient Not Found",
                 code="PATIENT_NOT_FOUND",
                 status=404,
-                details=[f"Patient with ID {request.patient_id} does not exist"]
+                details=[f"Patient with ID {patient_id} does not exist"]
             )
             raise NotFoundException(
                 message="The patient you're searching for doesn't exist",
                 error_detail=error
             )
 
-        # Validate patient has medical data
-        medical_data = self.medical_data_repository.find_by_patient_id(request.patient_id)
+        medical_data = self.medical_data_repository.find_latest_by_patient_id(patient_id)
         if not medical_data:
             error = ErrorDetail(
                 title="Medical Data Missing",
@@ -104,7 +93,15 @@ class SimilarPatientService:
                 error_detail=error
             )
 
-        # Check Neo4j availability
+        return medical_data
+
+    def _check_neo4j_availability(self):
+        """
+        Check Neo4j is available.
+
+        Raises:
+            ServiceUnavailableException: If Neo4j unavailable
+        """
         if not self.neo4j_manager.is_available():
             error = ErrorDetail(
                 title="Service Unavailable",
@@ -117,14 +114,28 @@ class SimilarPatientService:
                 error_detail=error
             )
 
-        # Build patient profile from medical data
-        patient_profile = self._build_patient_profile(medical_data)
+    def find_similar_patients(self, request: FindSimilarPatientsRequest) -> SimilarPatientsResponse:
+        """
+        Find similar patient cases in tabular format.
 
-        # Get Neo4j database instance
+        Args:
+            request: FindSimilarPatientsRequest DTO
+
+        Returns:
+            SimilarPatientsResponse DTO with list of similar cases
+
+        Raises:
+            NotFoundException: If patient not found
+            BadRequestException: If patient has no medical data
+            ServiceUnavailableException: If Neo4j unavailable
+        """
+        medical_data = self._validate_patient_and_get_medical_data(request.patient_id)
+        self._check_neo4j_availability()
+
+        patient_profile = self._build_patient_profile(medical_data)
         neo4j_db = self.neo4j_manager.get_database()
 
         try:
-            # Call Neo4j method to find similar patients
             similar_cases_raw = neo4j_db.find_similar_patients(
                 patient_profile=patient_profile,
                 limit=request.limit,
@@ -132,7 +143,6 @@ class SimilarPatientService:
                 min_similarity=request.min_similarity
             )
 
-            # Convert to response DTOs
             similar_cases = []
             for case in similar_cases_raw:
                 similar_case = SimilarPatientCaseResponse(
@@ -148,7 +158,6 @@ class SimilarPatientService:
                 )
                 similar_cases.append(similar_case)
 
-            # Build filters applied
             filters_applied = {
                 "treatment": request.treatment_filter,
                 "min_similarity": request.min_similarity,
@@ -177,10 +186,7 @@ class SimilarPatientService:
 
     def find_similar_patients_graph(self, request: FindSimilarPatientsGraphRequest) -> SimilarPatientsGraphResponse:
         """
-        Find similar patient cases in graph format.
-
-        Returns graph structure with nodes and edges for visualization
-        in frontend graph libraries (D3.js, Cytoscape, vis.js, etc.).
+        Find similar patient cases in graph format for visualization.
 
         Args:
             request: FindSimilarPatientsGraphRequest DTO
@@ -193,62 +199,19 @@ class SimilarPatientService:
             BadRequestException: If patient has no medical data
             ServiceUnavailableException: If Neo4j unavailable
         """
-        # Validate patient exists
-        patient = self.patient_repository.find_by_id(request.patient_id)
-        if not patient:
-            error = ErrorDetail(
-                title="Patient Not Found",
-                code="PATIENT_NOT_FOUND",
-                status=404,
-                details=[f"Patient with ID {request.patient_id} does not exist"]
-            )
-            raise NotFoundException(
-                message="The patient you're searching for doesn't exist",
-                error_detail=error
-            )
+        medical_data = self._validate_patient_and_get_medical_data(request.patient_id)
+        self._check_neo4j_availability()
 
-        # Validate patient has medical data
-        medical_data = self.medical_data_repository.find_by_patient_id(request.patient_id)
-        if not medical_data:
-            error = ErrorDetail(
-                title="Medical Data Missing",
-                code="NO_MEDICAL_DATA",
-                status=400,
-                details=["Patient must have medical data to find similar cases"]
-            )
-            raise BadRequestException(
-                message="Cannot find similar cases without patient medical data",
-                error_detail=error
-            )
-
-        # Check Neo4j availability
-        if not self.neo4j_manager.is_available():
-            error = ErrorDetail(
-                title="Service Unavailable",
-                code="NEO4J_UNAVAILABLE",
-                status=503,
-                details=["Graph database is currently unavailable"]
-            )
-            raise ServiceUnavailableException(
-                message="Similar patient search is temporarily unavailable",
-                error_detail=error
-            )
-
-        # Build patient profile from medical data
         patient_profile = self._build_patient_profile(medical_data)
-
-        # Get Neo4j database instance
         neo4j_db = self.neo4j_manager.get_database()
 
         try:
-            # Call Neo4j method to find similar patients (graph format)
             graph_data = neo4j_db.find_similar_cases_graph(
                 patient_profile=patient_profile,
                 limit=request.limit,
                 treatment_filter=request.treatment_filter
             )
 
-            # Convert to response DTOs
             nodes = []
             for node in graph_data['nodes']:
                 graph_node = GraphNodeResponse(
@@ -299,38 +262,21 @@ class SimilarPatientService:
         """
         Get complete details of a similar patient case from Neo4j.
 
-        Used to retrieve full information about historical synthetic patients
-        from the Neo4j dataset. These are reference cases for clinical comparison,
-        not operational patients from PostgreSQL.
-
         Args:
             request: GetSimilarPatientDetailRequest DTO with case_id
 
         Returns:
-            SimilarPatientDetailResponse DTO with complete patient information
+            SimilarPatientDetailResponse DTO
 
         Raises:
             NotFoundException: If patient case not found in Neo4j
             ServiceUnavailableException: If Neo4j unavailable
         """
-        # Check Neo4j availability
-        if not self.neo4j_manager.is_available():
-            error = ErrorDetail(
-                title="Service Unavailable",
-                code="NEO4J_UNAVAILABLE",
-                status=503,
-                details=["Graph database is currently unavailable"]
-            )
-            raise ServiceUnavailableException(
-                message="Patient case lookup is temporarily unavailable",
-                error_detail=error
-            )
+        self._check_neo4j_availability()
 
-        # Get Neo4j database instance
         neo4j_db = self.neo4j_manager.get_database()
 
         try:
-            # Call Neo4j method to get patient by ID
             patient_data = neo4j_db.get_patient_by_id(request.case_id)
 
             if not patient_data:
@@ -345,7 +291,6 @@ class SimilarPatientService:
                     error_detail=error
                 )
 
-            # Convert to response DTOs
             demographics = DemographicsResponse(**patient_data['demographics'])
             clinical_features = ClinicalFeaturesResponse(**patient_data['clinical_features'])
             clinical_categories = ClinicalCategoriesResponse(**patient_data['clinical_categories'])
@@ -369,7 +314,6 @@ class SimilarPatientService:
             )
 
         except NotFoundException:
-            # Re-raise NotFoundException as is
             raise
         except Exception as e:
             logger.error(f"Error retrieving patient case {request.case_id}: {e}")
@@ -387,8 +331,6 @@ class SimilarPatientService:
     def _build_patient_profile(self, medical_data) -> Dict[str, Any]:
         """
         Build patient profile dictionary from medical data entity.
-
-        Converts medical data entity to the format expected by Neo4j methods.
 
         Args:
             medical_data: PatientMedicalData entity
