@@ -31,10 +31,9 @@ prediction_management_service = PredictionManagementService()
 @jwt_auth.jwt_access_required
 @jwt_auth.role_required('DOCTOR')
 def generate_prediction():
-    """Generate AI prediction for a patient."""
+    """Generate AI prediction for a medical data snapshot."""
     request_dto = GeneratePredictionRequest(**request.json)
 
-    # Get current user ID from JWT
     current_user_id = jwt_auth.get_current_user_id()
 
     prediction_dto = prediction_service.generate_prediction(request_dto, current_user_id)
@@ -76,16 +75,16 @@ def get_prediction(prediction_id):
 @jwt_auth.jwt_access_required
 @jwt_auth.role_required('DOCTOR')
 def list_predictions():
-    """List all recommendation with pagination and filters."""
+    """List all recommendations with pagination and filters."""
     request_dto = ListPredictionsRequest(
         page=request.args.get('page', 1, type=int),
         per_page=request.args.get('per_page', 20, type=int),
         patient_id=request.args.get('patient_id', None, type=str)
     )
 
-    recommendation, total = prediction_management_service.list_predictions(request_dto)
+    recommendations, total = prediction_management_service.list_predictions(request_dto)
 
-    predictions_data = [pred.model_dump() for pred in recommendation]
+    predictions_data = [pred.model_dump() for pred in recommendations]
 
     response = PaginatedResponse.success(
         value=predictions_data,
