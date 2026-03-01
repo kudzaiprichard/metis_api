@@ -185,24 +185,12 @@ class SimilarPatientService:
             )
 
     def find_similar_patients_graph(self, request: FindSimilarPatientsGraphRequest) -> SimilarPatientsGraphResponse:
-        """
-        Find similar patient cases in graph format for visualization.
-
-        Args:
-            request: FindSimilarPatientsGraphRequest DTO
-
-        Returns:
-            SimilarPatientsGraphResponse DTO with graph structure
-
-        Raises:
-            NotFoundException: If patient not found
-            BadRequestException: If patient has no medical data
-            ServiceUnavailableException: If Neo4j unavailable
-        """
         medical_data = self._validate_patient_and_get_medical_data(request.patient_id)
         self._check_neo4j_availability()
 
         patient_profile = self._build_patient_profile(medical_data)
+        print(f"[DEBUG] Patient profile: {patient_profile}")
+
         neo4j_db = self.neo4j_manager.get_database()
 
         try:
@@ -211,6 +199,10 @@ class SimilarPatientService:
                 limit=request.limit,
                 treatment_filter=request.treatment_filter
             )
+
+            print(f"[DEBUG] Nodes found: {len(graph_data['nodes'])}")
+            print(f"[DEBUG] Edges found: {len(graph_data['edges'])}")
+            print(f"[DEBUG] Metadata: {graph_data['metadata']}")
 
             nodes = []
             for node in graph_data['nodes']:
@@ -340,8 +332,8 @@ class SimilarPatientService:
         """
         return {
             'age': int(medical_data.age),
-            'gender': medical_data.gender,
-            'ethnicity': medical_data.ethnicity,
+            'gender': medical_data.gender.value,
+            'ethnicity': medical_data.ethnicity.value,
             'hba1c_baseline': float(medical_data.hba1c_baseline),
             'diabetes_duration': float(medical_data.diabetes_duration),
             'fasting_glucose': float(medical_data.fasting_glucose),
