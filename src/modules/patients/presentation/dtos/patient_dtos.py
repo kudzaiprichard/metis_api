@@ -9,7 +9,6 @@ from src.modules.recommendation.presentation.dtos.prediction_dtos import Predict
 # ============ Shared Patient Response ============
 
 class PatientResponse(BaseModel):
-    """Standard patient response DTO."""
     id: str
     first_name: str
     last_name: str
@@ -18,15 +17,12 @@ class PatientResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    model_config = {
-        'from_attributes': True
-    }
+    model_config = {'from_attributes': True}
 
 
 # ============ Patient Medical Data Response ============
 
 class PatientMedicalDataResponse(BaseModel):
-    """Patient medical data response DTO with its prediction."""
     id: str
     patient_id: str
     age: int
@@ -50,19 +46,17 @@ class PatientMedicalDataResponse(BaseModel):
     cvd: bool
     nafld: bool
     retinopathy: bool
+    # Made Optional so records without a prediction still serialize fine
     prediction: Optional[PredictionDetailResponse] = None
     created_at: datetime
     updated_at: datetime
 
-    model_config = {
-        'from_attributes': True
-    }
+    model_config = {'from_attributes': True}
 
 
-# ============ Patient Detail Response (with medical records history) ============
+# ============ Patient Detail Response ============
 
 class PatientDetailResponse(BaseModel):
-    """Patient with all medical records (most recent first)."""
     id: str
     first_name: str
     last_name: str
@@ -72,15 +66,12 @@ class PatientDetailResponse(BaseModel):
     updated_at: datetime
     medical_records: List[PatientMedicalDataResponse] = []
 
-    model_config = {
-        'from_attributes': True
-    }
+    model_config = {'from_attributes': True}
 
 
 # ============ Create Patient ============
 
 class CreatePatientRequest(BaseModel):
-    """DTO for creating a new patient."""
     first_name: str = Field(..., min_length=2, max_length=100)
     last_name: str = Field(..., min_length=2, max_length=100)
     email: Optional[EmailStr] = None
@@ -89,7 +80,6 @@ class CreatePatientRequest(BaseModel):
     @field_validator('first_name', 'last_name')
     @classmethod
     def validate_name_characters(cls, v, info):
-        """Validate name contains only valid characters."""
         import re
         if not re.match(r"^[a-zA-Z\s\-']+$", v):
             field_name = info.field_name.replace('_', ' ').title()
@@ -99,7 +89,6 @@ class CreatePatientRequest(BaseModel):
     @field_validator('mobile_number')
     @classmethod
     def validate_mobile_number(cls, v):
-        """Validate mobile number format."""
         if v is None:
             return v
         import re
@@ -108,15 +97,12 @@ class CreatePatientRequest(BaseModel):
             raise ValueError('Mobile number must be 10-15 digits with optional + prefix')
         return v.strip()
 
-    model_config = {
-        'str_strip_whitespace': True
-    }
+    model_config = {'str_strip_whitespace': True}
 
 
 # ============ Update Patient Contact Info ============
 
 class UpdatePatientContactRequest(BaseModel):
-    """DTO for updating patient contact information."""
     first_name: Optional[str] = Field(None, min_length=2, max_length=100)
     last_name: Optional[str] = Field(None, min_length=2, max_length=100)
     email: Optional[EmailStr] = None
@@ -125,7 +111,6 @@ class UpdatePatientContactRequest(BaseModel):
     @field_validator('first_name', 'last_name')
     @classmethod
     def validate_name_characters(cls, v, info):
-        """Validate name contains only valid characters."""
         if v is None:
             return v
         import re
@@ -137,7 +122,6 @@ class UpdatePatientContactRequest(BaseModel):
     @field_validator('mobile_number')
     @classmethod
     def validate_mobile_number(cls, v):
-        """Validate mobile number format."""
         if v is None:
             return v
         import re
@@ -146,15 +130,12 @@ class UpdatePatientContactRequest(BaseModel):
             raise ValueError('Mobile number must be 10-15 digits with optional + prefix')
         return v.strip()
 
-    model_config = {
-        'str_strip_whitespace': True
-    }
+    model_config = {'str_strip_whitespace': True}
 
 
 # ============ Create/Update Patient Medical Data ============
 
 class CreatePatientMedicalDataRequest(BaseModel):
-    """DTO for creating patient medical data."""
     patient_id: str
     age: int = Field(..., ge=18, le=120)
     gender: str = Field(..., description="Must be 'Male' or 'Female'")
@@ -181,7 +162,6 @@ class CreatePatientMedicalDataRequest(BaseModel):
     @field_validator('gender')
     @classmethod
     def validate_gender(cls, v):
-        """Validate gender is valid."""
         if v not in ['Male', 'Female']:
             raise ValueError("Gender must be 'Male' or 'Female'")
         return v
@@ -189,7 +169,6 @@ class CreatePatientMedicalDataRequest(BaseModel):
     @field_validator('ethnicity')
     @classmethod
     def validate_ethnicity(cls, v):
-        """Validate ethnicity is valid."""
         valid_ethnicities = ['Caucasian', 'African', 'Asian', 'Hispanic', 'Other']
         if v not in valid_ethnicities:
             raise ValueError(f"Ethnicity must be one of: {', '.join(valid_ethnicities)}")
@@ -197,7 +176,6 @@ class CreatePatientMedicalDataRequest(BaseModel):
 
 
 class UpdatePatientMedicalDataRequest(BaseModel):
-    """DTO for updating patient medical data."""
     age: Optional[int] = Field(None, ge=18, le=120)
     gender: Optional[str] = None
     ethnicity: Optional[str] = None
@@ -240,29 +218,24 @@ class UpdatePatientMedicalDataRequest(BaseModel):
 # ============ Get Single Patient ============
 
 class GetPatientRequest(BaseModel):
-    """DTO for getting a single patient by ID."""
     patient_id: str = Field(..., min_length=1)
 
 
 # ============ Delete Patient ============
 
 class DeletePatientRequest(BaseModel):
-    """DTO for deleting a patient."""
     patient_id: str = Field(..., min_length=1)
 
 
-# ============ List Patients (Pagination & Search) ============
+# ============ List Patients ============
 
 class ListPatientsRequest(BaseModel):
-    """DTO for listing patients with pagination and search."""
-    page: int = Field(default=1, ge=1, description="Page number (starts at 1)")
-    per_page: int = Field(default=20, ge=1, le=100, description="Items per page (max 100)")
+    page: int = Field(default=1, ge=1)
+    per_page: int = Field(default=20, ge=1, le=100)
     search: Optional[str] = None
 
     def get_offset(self) -> int:
-        """Calculate database offset for pagination."""
         return (self.page - 1) * self.per_page
 
     def get_limit(self) -> int:
-        """Get limit for database query."""
         return self.per_page
