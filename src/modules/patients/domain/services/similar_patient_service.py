@@ -44,7 +44,8 @@ logger = logging.getLogger(__name__)
 class SimilarPatientService:
     """
     Service for finding similar patient cases.
-    Uses the latest medical data record for similarity matching.
+    Supports lookup by patient_id (uses latest medical record) or
+    by medical_data_id (uses that specific record directly).
     """
 
     def __init__(self):
@@ -52,21 +53,41 @@ class SimilarPatientService:
         self.medical_data_repository = PatientMedicalDataRepository()
         self.neo4j_manager = get_neo4j_manager()
 
-    def _validate_patient_and_get_medical_data(self, patient_id: str):
+    def _resolve_medical_data(self, patient_id: str = None, medical_data_id: str = None):
         """
-        Validate patient exists and has medical data.
-        Returns the latest medical data record.
+        Resolve medical data from either patient_id or medical_data_id.
+
+        If medical_data_id is provided, it takes priority and fetches that
+        specific record directly. Otherwise, fetches the latest medical
+        record for the given patient_id.
 
         Args:
-            patient_id: Patient ID
+            patient_id: Patient ID (uses latest medical record)
+            medical_data_id: Specific medical data record ID
 
         Returns:
-            Latest PatientMedicalData instance
+            Tuple of (medical_data, resolved_patient_id)
 
         Raises:
-            NotFoundException: If patient not found
-            BadRequestException: If no medical data exists
+            NotFoundException: If patient or medical data not found
+            BadRequestException: If patient has no medical data
         """
+        if medical_data_id:
+            medical_data = self.medical_data_repository.find_by_id(medical_data_id)
+            if not medical_data:
+                error = ErrorDetail(
+                    title="Medical Data Not Found",
+                    code="MEDICAL_DATA_NOT_FOUND",
+                    status=404,
+                    details=[f"Medical data with ID {medical_data_id} does not exist"]
+                )
+                raise NotFoundException(
+                    message="The medical data record you're searching with doesn't exist",
+                    error_detail=error
+                )
+            return medical_data, medical_data.patient_id
+
+        # Fall back to patient_id — fetch latest medical record
         patient = self.patient_repository.find_by_id(patient_id)
         if not patient:
             error = ErrorDetail(
@@ -93,7 +114,7 @@ class SimilarPatientService:
                 error_detail=error
             )
 
-        return medical_data
+        return medical_data, patient_id
 
     def _check_neo4j_availability(self):
         """
@@ -119,17 +140,20 @@ class SimilarPatientService:
         Find similar patient cases in tabular format.
 
         Args:
-            request: FindSimilarPatientsRequest DTO
+            request: FindSimilarPatientsRequest DTO (with patient_id or medical_data_id)
 
         Returns:
             SimilarPatientsResponse DTO with list of similar cases
 
         Raises:
-            NotFoundException: If patient not found
+            NotFoundException: If patient or medical data not found
             BadRequestException: If patient has no medical data
             ServiceUnavailableException: If Neo4j unavailable
         """
-        medical_data = self._validate_patient_and_get_medical_data(request.patient_id)
+        medical_data, resolved_patient_id = self._resolve_medical_data(
+            patient_id=request.patient_id,
+            medical_data_id=request.medical_data_id
+        )
         self._check_neo4j_availability()
 
         patient_profile = self._build_patient_profile(medical_data)
@@ -161,11 +185,12 @@ class SimilarPatientService:
             filters_applied = {
                 "treatment": request.treatment_filter,
                 "min_similarity": request.min_similarity,
-                "limit": request.limit
+                "limit": request.limit,
+                "lookup_by": "medical_data_id" if request.medical_data_id else "patient_id"
             }
 
             return SimilarPatientsResponse(
-                patient_id=request.patient_id,
+                patient_id=resolved_patient_id,
                 similar_cases=similar_cases,
                 total_found=len(similar_cases),
                 filters_applied=filters_applied
@@ -185,7 +210,24 @@ class SimilarPatientService:
             )
 
     def find_similar_patients_graph(self, request: FindSimilarPatientsGraphRequest) -> SimilarPatientsGraphResponse:
-        medical_data = self._validate_patient_and_get_medical_data(request.patient_id)
+        """
+        Find similar patient cases in graph format for visualization.
+
+        Args:
+            request: FindSimilarPatientsGraphRequest DTO (with patient_id or medical_data_id)
+
+        Returns:
+            SimilarPatientsGraphResponse DTO
+
+        Raises:
+            NotFoundException: If patient or medical data not found
+            BadRequestException: If patient has no medical data
+            ServiceUnavailableException: If Neo4j unavailable
+        """
+        medical_data, resolved_patient_id = self._resolve_medical_data(
+            patient_id=request.patient_id,
+            medical_data_id=request.medical_data_id
+        )
         self._check_neo4j_availability()
 
         patient_profile = self._build_patient_profile(medical_data)
@@ -231,7 +273,7 @@ class SimilarPatientService:
             metadata = GraphMetadataResponse(**graph_data['metadata'])
 
             return SimilarPatientsGraphResponse(
-                patient_id=request.patient_id,
+                patient_id=resolved_patient_id,
                 nodes=nodes,
                 edges=edges,
                 metadata=metadata

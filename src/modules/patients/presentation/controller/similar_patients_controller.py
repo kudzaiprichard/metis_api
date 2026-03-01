@@ -32,9 +32,14 @@ def find_similar_patients():
     """
     Find similar patient cases in tabular format.
 
+    Provide either patient_id (uses latest medical record) or
+    medical_data_id (uses that specific record). If both are provided,
+    medical_data_id takes priority.
+
     Request body:
     {
-        "patient_id": "uuid",
+        "patient_id": "uuid",           # optional if medical_data_id provided
+        "medical_data_id": "uuid",      # optional if patient_id provided
         "limit": 5,
         "treatment_filter": "Metformin",  # optional
         "min_similarity": 0.5  # optional
@@ -63,9 +68,14 @@ def find_similar_patients_graph():
     """
     Find similar patient cases in graph format for visualization.
 
+    Provide either patient_id (uses latest medical record) or
+    medical_data_id (uses that specific record). If both are provided,
+    medical_data_id takes priority.
+
     Request body:
     {
-        "patient_id": "uuid",
+        "patient_id": "uuid",           # optional if medical_data_id provided
+        "medical_data_id": "uuid",      # optional if patient_id provided
         "limit": 5,
         "treatment_filter": "Metformin",  # optional
         "min_similarity": 0.5  # optional

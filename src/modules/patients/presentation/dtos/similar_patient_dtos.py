@@ -3,7 +3,7 @@ DTOs for similar patient search functionality.
 """
 
 from typing import Optional, List
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from decimal import Decimal
 
 
@@ -13,10 +13,12 @@ class FindSimilarPatientsRequest(BaseModel):
     """
     DTO for finding similar patients (tabular format).
 
-    Used by REST API endpoints to find similar patient cases based on
-    clinical features and comorbidity overlap.
+    Accepts either patient_id (uses latest medical record) or
+    medical_data_id (uses that specific record). If both are provided,
+    medical_data_id takes priority.
     """
-    patient_id: str = Field(..., min_length=1, description="Patient ID to find similar cases for")
+    patient_id: Optional[str] = Field(None, min_length=1, description="Patient ID to find similar cases for (uses latest medical record)")
+    medical_data_id: Optional[str] = Field(None, min_length=1, description="Specific medical data record ID to use for similarity search")
     limit: int = Field(default=5, ge=1, le=20, description="Maximum number of similar cases (1-20)")
     treatment_filter: Optional[str] = Field(
         None,
@@ -28,6 +30,12 @@ class FindSimilarPatientsRequest(BaseModel):
         le=1.0,
         description="Minimum similarity threshold (0.0-1.0)"
     )
+
+    @model_validator(mode='after')
+    def validate_at_least_one_id(self):
+        if not self.patient_id and not self.medical_data_id:
+            raise ValueError("Either 'patient_id' or 'medical_data_id' must be provided")
+        return self
 
     model_config = {
         'str_strip_whitespace': True
@@ -38,10 +46,12 @@ class FindSimilarPatientsGraphRequest(BaseModel):
     """
     DTO for finding similar patients (graph format).
 
-    Returns graph structure with nodes and edges for visualization
-    in frontend graph libraries (D3.js, Cytoscape, etc.).
+    Accepts either patient_id (uses latest medical record) or
+    medical_data_id (uses that specific record). If both are provided,
+    medical_data_id takes priority.
     """
-    patient_id: str = Field(..., min_length=1, description="Patient ID to find similar cases for")
+    patient_id: Optional[str] = Field(None, min_length=1, description="Patient ID to find similar cases for (uses latest medical record)")
+    medical_data_id: Optional[str] = Field(None, min_length=1, description="Specific medical data record ID to use for similarity search")
     limit: int = Field(default=5, ge=1, le=20, description="Maximum number of similar cases (1-20)")
     treatment_filter: Optional[str] = Field(
         None,
@@ -53,6 +63,12 @@ class FindSimilarPatientsGraphRequest(BaseModel):
         le=1.0,
         description="Minimum similarity threshold (0.0-1.0)"
     )
+
+    @model_validator(mode='after')
+    def validate_at_least_one_id(self):
+        if not self.patient_id and not self.medical_data_id:
+            raise ValueError("Either 'patient_id' or 'medical_data_id' must be provided")
+        return self
 
     model_config = {
         'str_strip_whitespace': True
